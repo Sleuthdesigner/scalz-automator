@@ -11,27 +11,25 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Customize these to white-label the dashboard for your agency
 const BRANDING = {
     // Agency / Company name shown in sidebar, login page, and emails
-    name: 'SEO Automator',
+    name: 'SCALZ',
     
     // Short name for compact spaces (sidebar collapsed, mobile)
-    shortName: 'SEO',
+    shortName: 'SCALZ',
     
     // Accent portion of the name (rendered in the accent color)
-    // e.g., if name is "Acme SEO" and accentText is "SEO", it renders as: Acme<accent>SEO</accent>
-    accentText: 'Automator',
+    accentText: 'AI',
     
     // Logo icon (Font Awesome class) — used when no custom logo URL is set
     icon: 'fas fa-bolt',
     
-    // Custom logo URL (optional — set to '' to use icon instead)
-    // Recommended size: 32x32px or 40x40px PNG/SVG
-    logoUrl: '',
+    // Custom logo URL — Scalz white logo
+    logoUrl: 'https://scalz.ai/wp-content/uploads/2024/02/SCALZwhite-1.png',
     
     // Tagline shown on login page
     tagline: 'WordPress SEO Automation Platform',
     
-    // Primary accent color (used for active nav items, buttons, links)
-    accentColor: '#4f8fff',
+    // Primary accent color (teal from scalz.ai)
+    accentColor: '#13e4e6',
     
     // Success color
     successColor: '#22c55e',
@@ -47,7 +45,7 @@ const BRANDING = {
     footerText: '',
     
     // Help/Support URL (optional — adds a help link in sidebar)
-    supportUrl: '',
+    supportUrl: 'https://scalz.ai',
 };
 
 // Workflow step definitions
