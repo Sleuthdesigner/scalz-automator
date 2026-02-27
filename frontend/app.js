@@ -172,6 +172,8 @@ function applyBranding() {
             loginLogo.src = b.logoUrl;
             loginLogo.classList.remove('hidden');
         }
+        // Hide the text title when logo image is displayed (logo already contains brand name)
+        if (loginTitle) loginTitle.style.display = 'none';
     } else if (b.icon && loginIcon) {
         loginIcon.innerHTML = '<i class="' + b.icon + '"></i>';
     }
