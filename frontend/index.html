@@ -1,154 +1,307 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SEO Automator</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <!-- Supabase JS SDK v2 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
 
-<div id="config-error-screen" style="display:none; position:fixed; inset:0; background:#0c0c14; color:#f0f0fc; align-items:center; justify-content:center; flex-direction:column; gap:16px; z-index:9999; font-family:system-ui,sans-serif; text-align:center; padding:24px;">
-  <i class="fas fa-triangle-exclamation" style="font-size:48px; color:#ef4444;"></i>
-  <h2 style="margin:0;">Configuration Required</h2>
-  <p style="color:#9090b8; max-width:480px; margin:0;">Supabase credentials are not configured. Open <code>frontend/config.js</code> and replace the placeholder values with your actual Supabase URL and anon key.</p>
-  <a href="https://supabase.com/dashboard" target="_blank" style="color:#4f8fff;">Open Supabase Dashboard</a>
-</div>
-
-<div id="auth-screen" style="display:none;">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <i id="auth-logo-icon" class="fas fa-bolt"></i>
-      <span id="auth-logo-text">SEO Automator</span>
-    </div>
-    <p id="auth-tagline" class="auth-tagline">WordPress SEO Automation Platform</p>
-    <form id="auth-form" onsubmit="return false;">
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input type="email" id="email" autocomplete="email" required placeholder="you@agency.com">
-      </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" autocomplete="current-password" required placeholder="Password">
-      </div>
-      <button type="submit" class="btn btn-primary btn-full" id="auth-submit-btn" onclick="handleAuth()">Sign In</button>
-    </form>
-    <div id="auth-error" class="auth-error" style="display:none;"></div>
-    <p class="auth-switch">
-      <span id="auth-switch-text">Don't have an account?</span>
-      <a href="#" onclick="toggleAuthMode(); return false;" id="auth-switch-link">Sign Up</a>
-    </p>
-  </div>
-</div>
-
-<div id="app" style="display:none;">
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-logo">
-        <i id="sidebar-logo-icon" class="fas fa-bolt"></i>
-        <span id="sidebar-logo-text" class="sidebar-brand">SEO Automator</span>
-      </div>
-      <button class="sidebar-close" onclick="toggleSidebar()">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
-    <nav class="sidebar-nav">
-      <a href="#" class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard'); return false;">
-        <i class="fas fa-gauge-high"></i><span>Dashboard</span>
-      </a>
-      <a href="#" class="nav-item" data-page="clients" onclick="navigateTo('clients'); return false;">
-        <i class="fas fa-users"></i><span>Clients</span>
-      </a>
-      <a href="#" class="nav-item" data-page="workflow" onclick="navigateTo('workflow'); return false;">
-        <i class="fas fa-wand-magic-sparkles"></i><span>Workflow</span>
-      </a>
-      <a href="#" class="nav-item" data-page="blog" onclick="navigateTo('blog'); return false;">
-        <i class="fas fa-pen-nib"></i><span>Blog</span>
-      </a>
-      <a href="#" class="nav-item" data-page="linking" onclick="navigateTo('linking'); return false;">
-        <i class="fas fa-link"></i><span>Internal Links</span>
-      </a>
-      <a href="#" class="nav-item" data-page="jobs" onclick="navigateTo('jobs'); return false;">
-        <i class="fas fa-list-check"></i><span>Jobs</span>
-      </a>
-      <a href="#" class="nav-item" data-page="onboarding" onclick="navigateTo('onboarding'); return false;">
-        <i class="fas fa-envelope"></i><span>Onboarding</span>
-      </a>
-      <a href="#" class="nav-item" data-page="settings" onclick="navigateTo('settings'); return false;">
-        <i class="fas fa-gear"></i><span>Settings</span>
-      </a>
-    </nav>
-    <div class="sidebar-footer">
-      <button class="btn btn-ghost btn-sm btn-full" onclick="handleSignOut()">
-        <i class="fas fa-sign-out-alt"></i> Sign Out
-      </button>
-    </div>
-  </aside>
-  <main class="main-content" id="main-content">
-    <header class="topbar">
-      <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-      <h1 class="page-title" id="page-title">Dashboard</h1>
-      <div class="topbar-actions"><span class="user-email" id="user-email"></span></div>
-    </header>
-    <div class="page-content" id="page-content"></div>
-  </main>
-</div>
-
-<div id="client-modal" class="modal" style="display:none;">
-  <div class="modal-overlay" onclick="closeClientModal()"></div>
-  <div class="modal-dialog">
-    <div class="modal-header">
-      <h3 id="client-modal-title">Add Client</h3>
-      <button class="modal-close" onclick="closeClientModal()"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="modal-body">
-      <form id="client-form" onsubmit="return false;">
-        <div class="form-row">
-          <div class="form-group"><label>Business Name *</label><input type="text" id="cf-business-name" required></div>
-          <div class="form-group"><label>Niche / Industry</label><input type="text" id="cf-niche"></div>
+<!-- =============================================
+     CONFIG ERROR SCREEN
+============================================= -->
+<div id="config-error-screen" class="config-error-screen" style="display:none;">
+    <div class="config-error-card">
+        <div class="config-error-icon">
+            <i class="fa-solid fa-triangle-exclamation"></i>
         </div>
-        <div class="form-group"><label>Services</label><input type="text" id="cf-services"></div>
-        <div class="form-row">
-          <div class="form-group"><label>City *</label><input type="text" id="cf-city" required></div>
-          <div class="form-group"><label>State</label><input type="text" id="cf-state"></div>
-          <div class="form-group"><label>State Abbr</label><input type="text" id="cf-state-abbr" maxlength="2"></div>
+        <h1>Supabase Not Configured</h1>
+        <p>Before you can use the Scalz SEO Automator, you need to connect your Supabase project.</p>
+        <div class="config-steps">
+            <div class="config-step">
+                <span class="config-step-num">1</span>
+                <div>
+                    <strong>Open <code>config.js</code></strong>
+                    <p>Find this file in your project directory.</p>
+                </div>
+            </div>
+            <div class="config-step">
+                <span class="config-step-num">2</span>
+                <div>
+                    <strong>Get your Supabase credentials</strong>
+                    <p>Go to <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer">supabase.com/dashboard</a> → Your Project → Settings → API</p>
+                </div>
+            </div>
+            <div class="config-step">
+                <span class="config-step-num">3</span>
+                <div>
+                    <strong>Fill in the values</strong>
+                    <p>Replace <code>YOUR_SUPABASE_URL</code> and <code>YOUR_SUPABASE_ANON_KEY</code> with your actual credentials.</p>
+                </div>
+            </div>
+            <div class="config-step">
+                <span class="config-step-num">4</span>
+                <div>
+                    <strong>Reload this page</strong>
+                    <p>The app will connect to your Supabase project automatically.</p>
+                </div>
+            </div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label>Phone</label><input type="text" id="cf-phone"></div>
-          <div class="form-group"><label>Address</label><input type="text" id="cf-address"></div>
+        <div class="config-code-block">
+            <pre>// config.js
+const SUPABASE_URL = 'https://your-project.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIs...';</pre>
         </div>
-        <div class="form-group"><label>Site URL *</label><input type="url" id="cf-site-url" required></div>
-        <div class="form-row">
-          <div class="form-group"><label>API Key</label><input type="text" id="cf-api-key"></div>
-          <div class="form-group"><label>Contact Email</label><input type="email" id="cf-contact-email"></div>
-        </div>
-        <div class="form-group"><label>Logo URL</label><input type="url" id="cf-logo-url"></div>
-        <div class="form-group"><label>Special Instructions</label><textarea id="cf-special-instructions" rows="2"></textarea></div>
-      </form>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeClientModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveClient()">Save Client</button>
-    </div>
-  </div>
 </div>
 
-<div id="confirm-modal" class="modal" style="display:none;">
-  <div class="modal-overlay"></div>
-  <div class="modal-dialog modal-sm">
-    <div class="modal-header"><h3 id="confirm-title">Confirm</h3></div>
-    <div class="modal-body"><p id="confirm-message"></p></div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" id="confirm-cancel-btn">Cancel</button>
-      <button class="btn btn-danger" id="confirm-ok-btn">Delete</button>
+<!-- =============================================
+     ONBOARDING FORM (public, no auth required)
+============================================= -->
+<div id="onboarding-page" class="onboarding-page" style="display:none;">
+    <div class="onboarding-header">
+        <div class="onboarding-brand">
+            <div class="logo-icon" id="brand-icon-onboard"><i class="fa-solid fa-bolt"></i></div>
+            <img class="logo-img hidden" id="brand-logo-onboard" src="" alt="">
+            <span id="onboard-brand-name">SEO<span class="logo-accent" id="onboard-brand-accent">Automator</span></span>
+        </div>
     </div>
-  </div>
+    <div class="onboarding-body">
+        <div id="onboarding-form-area"></div>
+    </div>
 </div>
 
-<div id="toast-container"></div>
-<script src="app.js"></script>
+<!-- =============================================
+     LOGIN PAGE
+============================================= -->
+<div id="login-page" class="login-page" style="display:none;">
+    <div class="login-bg"></div>
+    <div class="login-card">
+        <div class="login-brand">
+            <div class="login-logo" id="brand-icon-login">
+                <i class="fa-solid fa-bolt"></i>
+            </div>
+            <img class="logo-img hidden" id="brand-logo-login" src="" alt="">
+            <h1 id="login-title">SEO Automator</h1>
+            <p id="login-tagline">WordPress SEO Automation Platform</p>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form" class="auth-form" autocomplete="off">
+            <div class="form-group">
+                <label for="login-email">Email Address</label>
+                <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="username" />
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password</label>
+                <div class="input-with-icon">
+                    <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password" />
+                    <button type="button" class="pw-toggle" data-target="login-password" tabindex="-1">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="login-error" class="auth-error" style="display:none;"></div>
+            <button type="submit" class="btn btn-primary btn-full" id="login-btn">
+                <span class="btn-text">Sign In</span>
+                <span class="btn-spinner" style="display:none;"><i class="fa-solid fa-spinner fa-spin"></i></span>
+            </button>
+        </form>
+
+        <!-- Signup Form -->
+        <form id="signup-form" class="auth-form" style="display:none;" autocomplete="off">
+            <div class="form-group">
+                <label for="signup-email">Email Address</label>
+                <input type="email" id="signup-email" placeholder="you@example.com" required autocomplete="username" />
+            </div>
+            <div class="form-group">
+                <label for="signup-password">Password</label>
+                <div class="input-with-icon">
+                    <input type="password" id="signup-password" placeholder="At least 8 characters" required autocomplete="new-password" />
+                    <button type="button" class="pw-toggle" data-target="signup-password" tabindex="-1">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="signup-password2">Confirm Password</label>
+                <div class="input-with-icon">
+                    <input type="password" id="signup-password2" placeholder="Repeat password" required autocomplete="new-password" />
+                    <button type="button" class="pw-toggle" data-target="signup-password2" tabindex="-1">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="signup-error" class="auth-error" style="display:none;"></div>
+            <button type="submit" class="btn btn-primary btn-full" id="signup-btn">
+                <span class="btn-text">Create Account</span>
+                <span class="btn-spinner" style="display:none;"><i class="fa-solid fa-spinner fa-spin"></i></span>
+            </button>
+        </form>
+
+        <div class="auth-switch">
+            <span id="auth-switch-text">Don't have an account?</span>
+            <button type="button" id="auth-switch-btn" class="link-btn">Sign up</button>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================
+     MAIN APP LAYOUT
+============================================= -->
+<div id="app" class="app-layout" style="display:none;">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-top">
+            <div class="sidebar-brand">
+                <div class="logo">
+                    <div class="logo-icon" id="brand-icon-sidebar">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <img class="logo-img hidden" id="brand-logo-sidebar" src="" alt="">
+                    <span class="logo-text" id="brand-name-sidebar">
+                        SEO<span class="logo-accent" id="brand-accent-sidebar">Automator</span>
+                    </span>
+                </div>
+            </div>
+            <button class="sidebar-close" id="sidebar-close" aria-label="Close sidebar">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#dashboard" class="nav-item" data-page="dashboard">
+                <i class="fa-solid fa-gauge-high"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="#clients" class="nav-item" data-page="clients">
+                <i class="fa-solid fa-building"></i>
+                <span>Clients</span>
+            </a>
+            <a href="#onboarding" class="nav-item" data-page="onboarding">
+                <i class="fa-solid fa-paper-plane"></i>
+                <span>Onboarding</span>
+            </a>
+            <a href="#prompts" class="nav-item" data-page="prompts">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Prompt Templates</span>
+            </a>
+            <a href="#workflow" class="nav-item" data-page="workflow">
+                <i class="fa-solid fa-gears"></i>
+                <span>Workflow</span>
+            </a>
+            <a href="#jobs" class="nav-item" data-page="jobs">
+                <i class="fa-solid fa-list-check"></i>
+                <span>Jobs</span>
+            </a>
+            <a href="#settings" class="nav-item" data-page="settings">
+                <i class="fa-solid fa-sliders"></i>
+                <span>Settings</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user" id="sidebar-user">
+                <div class="sidebar-user-avatar" id="sidebar-user-avatar">U</div>
+                <div class="sidebar-user-info">
+                    <span class="sidebar-user-email" id="sidebar-user-email">user@example.com</span>
+                    <span class="sidebar-user-role">Administrator</span>
+                </div>
+            </div>
+            <button class="sidebar-logout" id="logout-btn" title="Sign out">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Sidebar overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- Main content area -->
+    <div class="main-content">
+        <!-- Top bar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="topbar-menu-btn" id="sidebar-toggle" aria-label="Toggle sidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="topbar-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="global-search" placeholder="Search clients, jobs…" />
+                </div>
+            </div>
+            <div class="topbar-right">
+                <div class="topbar-status-dot" id="realtime-dot" title="Realtime disconnected"></div>
+                <button class="topbar-icon-btn" id="topbar-logout" title="Sign out">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Page content -->
+        <main class="page-content" id="page-content">
+            <!-- Rendered by JS -->
+        </main>
+    </div>
+</div>
+
+<!-- =============================================
+     MODAL
+============================================= -->
+<div id="modal-overlay" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true">
+    <div class="modal" id="modal">
+        <div class="modal-header">
+            <h2 class="modal-title" id="modal-title">Modal</h2>
+            <button class="modal-close" id="modal-close" aria-label="Close modal">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="modal-body" id="modal-body">
+            <!-- Dynamic content -->
+        </div>
+    </div>
+</div>
+
+<!-- =============================================
+     CONFIRM DIALOG
+============================================= -->
+<div id="confirm-overlay" class="modal-overlay" style="display:none;" role="alertdialog" aria-modal="true">
+    <div class="modal confirm-dialog">
+        <div class="modal-header">
+            <h2 class="modal-title" id="confirm-title">Confirm Action</h2>
+        </div>
+        <div class="modal-body">
+            <p id="confirm-message">Are you sure?</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+            <button class="btn btn-danger" id="confirm-ok">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- =============================================
+     TOAST CONTAINER
+============================================= -->
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<!-- Scripts -->
+<script src="./config.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>
