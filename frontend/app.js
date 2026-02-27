@@ -4,7 +4,7 @@
    Connects to Supabase for all data operations
 ============================================= */
 
-// In-memory store (replaces sessionStorage which is unavailable in sandboxed iframes)
+// In-memory store (replaces browser storage APIs unavailable in sandboxed iframes)
 const _memStore = {};
 
 /* =============================================
@@ -19,7 +19,7 @@ if (typeof SUPABASE_URL === 'undefined' || SUPABASE_URL === 'YOUR_SUPABASE_URL' 
 }
 
 // Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // App state
 let currentPage = null;
@@ -229,7 +229,7 @@ function hexToRgb(hex) {
 ============================================= */
 
 async function checkSession() {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const { data: { session }, error } = await sb.auth.getSession();
     if (error) {
         console.error('Session error:', error);
         showLoginPage();
@@ -298,7 +298,7 @@ function setupAuthForms() {
         setButtonLoading(btn, true);
         errEl.style.display = 'none';
 
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
 
         if (error) {
             errEl.textContent = error.message;
@@ -334,7 +334,7 @@ function setupAuthForms() {
 
         setButtonLoading(btn, true);
 
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await sb.auth.signUp({ email, password });
 
         if (error) {
             errEl.textContent = error.message;
@@ -358,7 +358,7 @@ function setupAuthForms() {
 }
 
 async function doLogout() {
-    await supabase.auth.signOut();
+    await sb.auth.signOut();
     currentUser = null;
     unsubscribeRealtime();
     showLoginPage();
@@ -366,7 +366,7 @@ async function doLogout() {
 }
 
 // Auth state listener
-supabase.auth.onAuthStateChange((event, session) => {
+sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_IN' && session) {
         currentUser = session.user;
     } else if (event === 'SIGNED_OUT') {
@@ -611,72 +611,72 @@ function handleRoute() {
 ============================================= */
 
 async function fetchClients() {
-    const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+    const { data, error } = await sb.from('clients').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
 }
 
 async function fetchClient(id) {
-    const { data, error } = await supabase.from('clients').select('*').eq('id', id).single();
+    const { data, error } = await sb.from('clients').select('*').eq('id', id).single();
     if (error) throw error;
     return data;
 }
 
 async function createClient(clientData) {
-    const { data, error } = await supabase.from('clients').insert([clientData]).select().single();
+    const { data, error } = await sb.from('clients').insert([clientData]).select().single();
     if (error) throw error;
     return data;
 }
 
 async function updateClient(id, updates) {
-    const { data, error } = await supabase.from('clients').update(updates).eq('id', id).select().single();
+    const { data, error } = await sb.from('clients').update(updates).eq('id', id).select().single();
     if (error) throw error;
     return data;
 }
 
 async function deleteClient(id) {
-    const { error } = await supabase.from('clients').delete().eq('id', id);
+    const { error } = await sb.from('clients').delete().eq('id', id);
     if (error) throw error;
 }
 
 async function fetchOnboardingTokens() {
-    const { data, error } = await supabase.from('onboarding_tokens').select('*').order('created_at', { ascending: false });
+    const { data, error } = await sb.from('onboarding_tokens').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
 }
 
 async function createOnboardingToken(tokenData) {
-    const { data, error } = await supabase.from('onboarding_tokens').insert([tokenData]).select().single();
+    const { data, error } = await sb.from('onboarding_tokens').insert([tokenData]).select().single();
     if (error) throw error;
     return data;
 }
 
 async function fetchOnboardingToken(token) {
-    const { data, error } = await supabase.from('onboarding_tokens').select('*').eq('token', token).single();
+    const { data, error } = await sb.from('onboarding_tokens').select('*').eq('token', token).single();
     if (error) return null;
     return data;
 }
 
 async function updateOnboardingToken(id, updates) {
-    const { data, error } = await supabase.from('onboarding_tokens').update(updates).eq('id', id).select().single();
+    const { data, error } = await sb.from('onboarding_tokens').update(updates).eq('id', id).select().single();
     if (error) throw error;
     return data;
 }
 
 async function fetchPromptTemplates() {
-    const { data, error } = await supabase.from('prompt_templates').select('*').order('category').order('name');
+    const { data, error } = await sb.from('prompt_templates').select('*').order('category').order('name');
     if (error) throw error;
     return data || [];
 }
 
 async function upsertPromptTemplate(template) {
-    const { data, error } = await supabase.from('prompt_templates').upsert([template], { onConflict: 'id' }).select().single();
+    const { data, error } = await sb.from('prompt_templates').upsert([template], { onConflict: 'id' }).select().single();
     if (error) throw error;
     return data;
 }
 
 async function fetchSettings() {
-    const { data, error } = await supabase.from('settings').select('*');
+    const { data, error } = await sb.from('settings').select('*');
     if (error) throw error;
     // Convert array of {key, value} to an object
     const obj = {};
@@ -685,14 +685,14 @@ async function fetchSettings() {
 }
 
 async function upsertSetting(key, value) {
-    const { data, error } = await supabase.from('settings').upsert([{ key, value }], { onConflict: 'key' }).select().single();
+    const { data, error } = await sb.from('settings').upsert([{ key, value }], { onConflict: 'key' }).select().single();
     if (error) throw error;
     return data;
 }
 
 async function upsertSettings(settingsObj) {
     const rows = Object.entries(settingsObj).map(([key, value]) => ({ key, value: String(value) }));
-    const { data, error } = await supabase.from('settings').upsert(rows, { onConflict: 'key' });
+    const { data, error } = await sb.from('settings').upsert(rows, { onConflict: 'key' });
     if (error) throw error;
     return data;
 }
@@ -733,38 +733,38 @@ async function fetchRecentClients(limit = 5) {
 }
 
 async function updateJob(id, updates) {
-    const { data, error } = await supabase.from('jobs').update(updates).eq('id', id).select().single();
+    const { data, error } = await sb.from('jobs').update(updates).eq('id', id).select().single();
     if (error) throw error;
     return data;
 }
 
 async function fetchPluginFiles() {
-    const { data, error } = await supabase.from('plugin_files').select('*').order('name');
+    const { data, error } = await sb.from('plugin_files').select('*').order('name');
     if (error) throw error;
     return data || [];
 }
 
 async function createPluginFile(pluginData) {
-    const { data, error } = await supabase.from('plugin_files').insert([pluginData]).select().single();
+    const { data, error } = await sb.from('plugin_files').insert([pluginData]).select().single();
     if (error) throw error;
     return data;
 }
 
 async function deletePluginFile(id) {
-    const { error } = await supabase.from('plugin_files').delete().eq('id', id);
+    const { error } = await sb.from('plugin_files').delete().eq('id', id);
     if (error) throw error;
 }
 
 async function fetchDashboardStats() {
     try {
-        const { data, error } = await supabase.rpc('get_dashboard_stats');
+        const { data, error } = await sb.rpc('get_dashboard_stats');
         if (error) throw error;
         return data;
     } catch (err) {
         // Fallback: compute stats from raw queries
         const [clients, jobs] = await Promise.all([
-            supabase.from('clients').select('id, status'),
-            supabase.from('jobs').select('id, status, created_at'),
+            sb.from('clients').select('id, status'),
+            sb.from('jobs').select('id, status, created_at'),
         ]);
         const allClients = clients.data || [];
         const allJobs    = jobs.data    || [];
@@ -783,7 +783,7 @@ async function fetchDashboardStats() {
 
 async function createWorkflowJobs(clientId, steps) {
     try {
-        const { data, error } = await supabase.rpc('create_workflow_jobs', {
+        const { data, error } = await sb.rpc('create_workflow_jobs', {
             p_client_id: clientId,
             p_steps: steps,
         });
@@ -797,14 +797,14 @@ async function createWorkflowJobs(clientId, steps) {
             status: 'queued',
             progress: 0,
         }));
-        const { data, error: insertError } = await supabase.from('jobs').insert(jobRows).select();
+        const { data, error: insertError } = await sb.from('jobs').insert(jobRows).select();
         if (insertError) throw insertError;
         return data;
     }
 }
 
 async function callWpProxy(clientId, endpoint, method = 'POST', payload = {}) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await sb.auth.getSession();
     if (!session) throw new Error('Not authenticated');
     const response = await fetch(`${SUPABASE_URL}/functions/v1/wp-proxy`, {
         method: 'POST',
@@ -818,7 +818,7 @@ async function callWpProxy(clientId, endpoint, method = 'POST', payload = {}) {
 }
 
 async function callAiGenerate(prompt, templateCategory = null, variables = null) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await sb.auth.getSession();
     if (!session) throw new Error('Not authenticated');
     const response = await fetch(`${SUPABASE_URL}/functions/v1/ai-generate`, {
         method: 'POST',
@@ -857,7 +857,7 @@ function subscribeToJobs(onUpdate) {
 
 function unsubscribeRealtime() {
     if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
+        sb.removeChannel(realtimeChannel);
         realtimeChannel = null;
     }
     const dot = document.getElementById('realtime-dot');
@@ -1892,7 +1892,7 @@ function bindTokenDeleteButtons() {
             const name = btn.dataset.name;
             showConfirm('Delete Token', `Delete the onboarding token for "${name}"?`, async () => {
                 try {
-                    const { error } = await supabase.from('onboarding_tokens').delete().eq('id', id);
+                    const { error } = await sb.from('onboarding_tokens').delete().eq('id', id);
                     if (error) throw error;
                     showToast('success', 'Deleted', 'Onboarding token deleted.');
                     const refreshedTokens = await fetchOnboardingTokens();
@@ -2094,11 +2094,11 @@ async function showOnboardingForm(token) {
                 };
 
                 // Insert client (anon insert policy required)
-                const { error: clientError } = await supabase.from('clients').insert([clientData]);
+                const { error: clientError } = await sb.from('clients').insert([clientData]);
                 if (clientError) throw clientError;
 
                 // Mark token as completed
-                await supabase.from('onboarding_tokens').update({ status: 'completed' }).eq('token', token);
+                await sb.from('onboarding_tokens').update({ status: 'completed' }).eq('token', token);
 
                 // Show success
                 formArea.innerHTML = `
@@ -2686,7 +2686,7 @@ function renderJobsTable(area, jobs, filter) {
 window.viewJobLog = async function(jobId) {
     openModal('Job Log', loadingHTML('Loading log…'));
     try {
-        const { data: job, error } = await supabase.from('jobs').select('*').eq('id', jobId).single();
+        const { data: job, error } = await sb.from('jobs').select('*').eq('id', jobId).single();
         if (error) throw error;
 
         const log = job.log || job.error_message || null;
@@ -3048,7 +3048,7 @@ function bindPluginDeleteButtons() {
 
 window.editPlugin = async function(id) {
     try {
-        const { data: plugin, error } = await supabase.from('plugin_files').select('*').eq('id', id).single();
+        const { data: plugin, error } = await sb.from('plugin_files').select('*').eq('id', id).single();
         if (error) throw error;
         openPluginModal(plugin, async () => {
             const p = await fetchPluginFiles();
@@ -3116,7 +3116,7 @@ function openPluginModal(plugin, onSave) {
         setButtonLoading(btn, true);
         try {
             if (isEdit) {
-                const { error } = await supabase.from('plugin_files').update(data).eq('id', plugin.id);
+                const { error } = await sb.from('plugin_files').update(data).eq('id', plugin.id);
                 if (error) throw error;
             } else {
                 await createPluginFile(data);
@@ -3146,8 +3146,8 @@ function setupGlobalSearch() {
         searchTimeout = setTimeout(async () => {
             try {
                 const [clients, jobs] = await Promise.all([
-                    supabase.from('clients').select('id, business_name').ilike('business_name', `%${q}%`).limit(3),
-                    supabase.from('jobs').select('id, task_type, status').ilike('task_type', `%${q}%`).limit(3),
+                    sb.from('clients').select('id, business_name').ilike('business_name', `%${q}%`).limit(3),
+                    sb.from('jobs').select('id, task_type, status').ilike('task_type', `%${q}%`).limit(3),
                 ]);
                 // Simple: navigate to clients if typing a name
                 if (clients.data && clients.data.length > 0 && q.length >= 3) {
