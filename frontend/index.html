@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEO Automator</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+</head>
+<body>
+
+<div id="config-error-screen" style="display:none; position:fixed; inset:0; background:#0c0c14; color:#f0f0fc; align-items:center; justify-content:center; flex-direction:column; gap:16px; z-index:9999; font-family:system-ui,sans-serif; text-align:center; padding:24px;">
+  <i class="fas fa-triangle-exclamation" style="font-size:48px; color:#ef4444;"></i>
+  <h2 style="margin:0;">Configuration Required</h2>
+  <p style="color:#9090b8; max-width:480px; margin:0;">Supabase credentials are not configured. Open <code>frontend/config.js</code> and replace the placeholder values with your actual Supabase URL and anon key.</p>
+  <a href="https://supabase.com/dashboard" target="_blank" style="color:#4f8fff;">Open Supabase Dashboard</a>
+</div>
+
+<div id="auth-screen" style="display:none;">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <i id="auth-logo-icon" class="fas fa-bolt"></i>
+      <span id="auth-logo-text">SEO Automator</span>
+    </div>
+    <p id="auth-tagline" class="auth-tagline">WordPress SEO Automation Platform</p>
+    <form id="auth-form" onsubmit="return false;">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" autocomplete="email" required placeholder="you@agency.com">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required placeholder="Password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-full" id="auth-submit-btn" onclick="handleAuth()">Sign In</button>
+    </form>
+    <div id="auth-error" class="auth-error" style="display:none;"></div>
+    <p class="auth-switch">
+      <span id="auth-switch-text">Don't have an account?</span>
+      <a href="#" onclick="toggleAuthMode(); return false;" id="auth-switch-link">Sign Up</a>
+    </p>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <i id="sidebar-logo-icon" class="fas fa-bolt"></i>
+        <span id="sidebar-logo-text" class="sidebar-brand">SEO Automator</span>
+      </div>
+      <button class="sidebar-close" onclick="toggleSidebar()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard" onclick="navigateTo('dashboard'); return false;">
+        <i class="fas fa-gauge-high"></i><span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-page="clients" onclick="navigateTo('clients'); return false;">
+        <i class="fas fa-users"></i><span>Clients</span>
+      </a>
+      <a href="#" class="nav-item" data-page="workflow" onclick="navigateTo('workflow'); return false;">
+        <i class="fas fa-wand-magic-sparkles"></i><span>Workflow</span>
+      </a>
+      <a href="#" class="nav-item" data-page="blog" onclick="navigateTo('blog'); return false;">
+        <i class="fas fa-pen-nib"></i><span>Blog</span>
+      </a>
+      <a href="#" class="nav-item" data-page="linking" onclick="navigateTo('linking'); return false;">
+        <i class="fas fa-link"></i><span>Internal Links</span>
+      </a>
+      <a href="#" class="nav-item" data-page="jobs" onclick="navigateTo('jobs'); return false;">
+        <i class="fas fa-list-check"></i><span>Jobs</span>
+      </a>
+      <a href="#" class="nav-item" data-page="onboarding" onclick="navigateTo('onboarding'); return false;">
+        <i class="fas fa-envelope"></i><span>Onboarding</span>
+      </a>
+      <a href="#" class="nav-item" data-page="settings" onclick="navigateTo('settings'); return false;">
+        <i class="fas fa-gear"></i><span>Settings</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn btn-ghost btn-sm btn-full" onclick="handleSignOut()">
+        <i class="fas fa-sign-out-alt"></i> Sign Out
+      </button>
+    </div>
+  </aside>
+  <main class="main-content" id="main-content">
+    <header class="topbar">
+      <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+      <h1 class="page-title" id="page-title">Dashboard</h1>
+      <div class="topbar-actions"><span class="user-email" id="user-email"></span></div>
+    </header>
+    <div class="page-content" id="page-content"></div>
+  </main>
+</div>
+
+<div id="client-modal" class="modal" style="display:none;">
+  <div class="modal-overlay" onclick="closeClientModal()"></div>
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 id="client-modal-title">Add Client</h3>
+      <button class="modal-close" onclick="closeClientModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="client-form" onsubmit="return false;">
+        <div class="form-row">
+          <div class="form-group"><label>Business Name *</label><input type="text" id="cf-business-name" required></div>
+          <div class="form-group"><label>Niche / Industry</label><input type="text" id="cf-niche"></div>
+        </div>
+        <div class="form-group"><label>Services</label><input type="text" id="cf-services"></div>
+        <div class="form-row">
+          <div class="form-group"><label>City *</label><input type="text" id="cf-city" required></div>
+          <div class="form-group"><label>State</label><input type="text" id="cf-state"></div>
+          <div class="form-group"><label>State Abbr</label><input type="text" id="cf-state-abbr" maxlength="2"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Phone</label><input type="text" id="cf-phone"></div>
+          <div class="form-group"><label>Address</label><input type="text" id="cf-address"></div>
+        </div>
+        <div class="form-group"><label>Site URL *</label><input type="url" id="cf-site-url" required></div>
+        <div class="form-row">
+          <div class="form-group"><label>API Key</label><input type="text" id="cf-api-key"></div>
+          <div class="form-group"><label>Contact Email</label><input type="email" id="cf-contact-email"></div>
+        </div>
+        <div class="form-group"><label>Logo URL</label><input type="url" id="cf-logo-url"></div>
+        <div class="form-group"><label>Special Instructions</label><textarea id="cf-special-instructions" rows="2"></textarea></div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeClientModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClient()">Save Client</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirm-modal" class="modal" style="display:none;">
+  <div class="modal-overlay"></div>
+  <div class="modal-dialog modal-sm">
+    <div class="modal-header"><h3 id="confirm-title">Confirm</h3></div>
+    <div class="modal-body"><p id="confirm-message"></p></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="confirm-cancel-btn">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="app.js"></script>
+</body>
+</html>
