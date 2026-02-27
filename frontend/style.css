@@ -2499,7 +2499,7 @@ tbody td {
     border-radius: 8px;
     object-fit: contain;
 }
-.logo-img.hidden, .logo-icon.hidden {
+.logo-img.hidden, .logo-icon.hidden, .login-logo.hidden {
     display: none;
 }
 .sidebar-brand-footer {
