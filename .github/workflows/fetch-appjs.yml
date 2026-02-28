@@ -1,4 +1,4 @@
-name: Fetch app.js from dpaste
+name: Fetch large frontend files
 
 on:
   workflow_dispatch:  # Manual trigger
@@ -8,7 +8,7 @@ on:
       - '.github/workflows/fetch-appjs.yml'  # Re-run if workflow itself changes
 
 jobs:
-  fetch-appjs:
+  fetch-files:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -23,18 +23,23 @@ jobs:
         run: |
           echo "Fetching app.js from dpaste..."
           curl -fsSL https://dpaste.com/93TC2YS6Z.txt -o frontend/app.js
-          echo "Downloaded $(wc -c < frontend/app.js) bytes"
-          head -3 frontend/app.js
+          echo "Downloaded $(wc -c < frontend/app.js) bytes for app.js"
 
-      - name: Commit and push app.js
+      - name: Fetch style.css from dpaste
+        run: |
+          echo "Fetching style.css from dpaste..."
+          curl -fsSL https://dpaste.com/7WTNR5WBU.txt -o frontend/style.css
+          echo "Downloaded $(wc -c < frontend/style.css) bytes for style.css"
+
+      - name: Commit and push files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add frontend/app.js
+          git add frontend/app.js frontend/style.css
           if git diff --cached --quiet; then
-            echo "No changes to app.js, skipping commit."
+            echo "No changes to commit, skipping."
           else
-            git commit -m "chore: update frontend/app.js from dpaste source"
+            git commit -m "chore: update frontend/app.js and frontend/style.css from dpaste sources"
             git push
-            echo "app.js committed and pushed successfully."
+            echo "Files committed and pushed successfully."
           fi
