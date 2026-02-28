@@ -867,16 +867,23 @@ function showFirstTimeSetupModal() {
                 </div>
 
                 <div style="font-weight:600;font-size:0.95rem;color:var(--text-primary);margin-top:var(--space-2);">SMTP Configuration</div>
-                <div style="display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-3);">
-                    <label class="toggle-wrapper" style="cursor:pointer;">
-                        <input type="radio" name="fts-smtp-choice" value="master" checked style="margin-right:var(--space-2);" />
-                        <span><strong>Use Scalz Master SMTP</strong> <span style="color:var(--text-muted);font-size:0.8rem;">(Recommended — works out of the box)</span></span>
-                    </label>
-                    <label class="toggle-wrapper" style="cursor:pointer;">
-                        <input type="radio" name="fts-smtp-choice" value="own" style="margin-right:var(--space-2);" />
-                        <span><strong>Use My Own SMTP Server</strong> <span style="color:var(--text-muted);font-size:0.8rem;">(Gmail, SendGrid, Mailgun, etc.)</span></span>
-                    </label>
+                <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:var(--space-3);">Select your email provider below or choose Custom to enter your own SMTP settings.</p>
+
+                <div class="form-group" style="margin-bottom:var(--space-3);">
+                    <label for="fts-smtp-provider">Email Provider</label>
+                    <select id="fts-smtp-provider">
+                        <option value="">Select a provider…</option>
+                        <option value="gmail">Gmail / Google Workspace</option>
+                        <option value="outlook">Outlook / Microsoft 365</option>
+                        <option value="sendgrid">SendGrid</option>
+                        <option value="mailgun">Mailgun</option>
+                        <option value="ses">Amazon SES</option>
+                        <option value="zoho">Zoho Mail</option>
+                        <option value="custom">Custom SMTP</option>
+                    </select>
                 </div>
+
+                <div id="fts-smtp-guide" style="display:none;padding:var(--space-3);background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:var(--space-4);font-size:0.82rem;color:var(--text-secondary);line-height:1.6;"></div>
 
                 <div id="fts-own-smtp" style="display:none;">
                     <div class="form-row">
@@ -886,7 +893,7 @@ function showFirstTimeSetupModal() {
                         </div>
                         <div class="form-group">
                             <label for="fts-smtp-port">Port</label>
-                            <input type="number" id="fts-smtp-port" value="587" placeholder="587" />
+                            <input type="number" id="fts-smtp-port" value="587" placeholder="587" min="1" max="65535" />
                         </div>
                     </div>
                     <div class="form-row">
@@ -916,12 +923,105 @@ function showFirstTimeSetupModal() {
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('active'));
 
-    // Toggle own SMTP fields
-    document.querySelectorAll('input[name="fts-smtp-choice"]').forEach(radio => {
-        radio.addEventListener('change', () => {
-            document.getElementById('fts-own-smtp').style.display =
-                document.querySelector('input[name="fts-smtp-choice"]:checked').value === 'own' ? 'block' : 'none';
-        });
+    // SMTP Provider Presets
+    const SMTP_PRESETS = {
+        gmail: {
+            host: 'smtp.gmail.com', port: '587',
+            guide: '<strong><i class="fa-solid fa-envelope"></i> Gmail / Google Workspace Setup</strong><br><br>' +
+                '1. Go to <a href="https://myaccount.google.com/security" target="_blank" rel="noopener">Google Account Security</a><br>' +
+                '2. Enable <strong>2-Step Verification</strong> if not already on<br>' +
+                '3. Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App Passwords</a><br>' +
+                '4. Create a new app password (select "Mail" and your device)<br>' +
+                '5. Copy the 16-character password Google gives you<br><br>' +
+                '<strong>Username:</strong> your full Gmail address (you@gmail.com)<br>' +
+                '<strong>Password:</strong> the 16-char app password (NOT your Google password)'
+        },
+        outlook: {
+            host: 'smtp.office365.com', port: '587',
+            guide: '<strong><i class="fa-solid fa-envelope"></i> Outlook / Microsoft 365 Setup</strong><br><br>' +
+                '1. Sign in to <a href="https://account.microsoft.com/security" target="_blank" rel="noopener">Microsoft Account Security</a><br>' +
+                '2. Enable <strong>Two-step verification</strong><br>' +
+                '3. Under "App passwords", click <strong>Create a new app password</strong><br>' +
+                '4. Copy the generated password<br><br>' +
+                '<strong>Username:</strong> your full Outlook/365 email address<br>' +
+                '<strong>Password:</strong> the app password (NOT your Microsoft password)<br>' +
+                '<strong>Note:</strong> Some Microsoft 365 orgs disable SMTP AUTH. Ask your admin to enable it at <em>Exchange Admin → Settings → Mail flow</em>.'
+        },
+        sendgrid: {
+            host: 'smtp.sendgrid.net', port: '587',
+            guide: '<strong><i class="fa-solid fa-paper-plane"></i> SendGrid Setup</strong><br><br>' +
+                '1. Sign up at <a href="https://signup.sendgrid.com/" target="_blank" rel="noopener">sendgrid.com</a> (free tier: 100 emails/day)<br>' +
+                '2. Go to <strong>Settings → API Keys</strong><br>' +
+                '3. Click <strong>Create API Key</strong> → choose "Full Access" or "Restricted Access" with Mail Send enabled<br>' +
+                '4. Copy the API key<br>' +
+                '5. Go to <strong>Settings → Sender Authentication</strong> and verify your domain or a single sender email<br><br>' +
+                '<strong>Username:</strong> <code>apikey</code> (literally the word "apikey")<br>' +
+                '<strong>Password:</strong> your SendGrid API key (starts with SG.)'
+        },
+        mailgun: {
+            host: 'smtp.mailgun.org', port: '587',
+            guide: '<strong><i class="fa-solid fa-paper-plane"></i> Mailgun Setup</strong><br><br>' +
+                '1. Sign up at <a href="https://www.mailgun.com/" target="_blank" rel="noopener">mailgun.com</a> (free: 5,000 emails/mo for 3 months)<br>' +
+                '2. Add and verify your sending domain under <strong>Sending → Domains</strong><br>' +
+                '3. Go to <strong>Sending → Domain settings → SMTP credentials</strong><br>' +
+                '4. Your default SMTP login is <code>postmaster@yourdomain.com</code><br>' +
+                '5. Reset or create a password for that user<br><br>' +
+                '<strong>Username:</strong> <code>postmaster@yourdomain.com</code><br>' +
+                '<strong>Password:</strong> the SMTP password you set in Mailgun'
+        },
+        ses: {
+            host: 'email-smtp.us-east-1.amazonaws.com', port: '587',
+            guide: '<strong><i class="fa-brands fa-aws"></i> Amazon SES Setup</strong><br><br>' +
+                '1. Open the <a href="https://console.aws.amazon.com/ses/" target="_blank" rel="noopener">Amazon SES Console</a><br>' +
+                '2. Verify your sending domain or email under <strong>Verified identities</strong><br>' +
+                '3. If in sandbox mode, you can only send to verified emails — <a href="https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html" target="_blank" rel="noopener">request production access</a> to send to anyone<br>' +
+                '4. Go to <strong>SMTP settings</strong> → click <strong>Create SMTP credentials</strong><br>' +
+                '5. An IAM user will be created — download the credentials<br><br>' +
+                '<strong>Host:</strong> change the region in the host if needed (e.g., <code>email-smtp.eu-west-1.amazonaws.com</code>)<br>' +
+                '<strong>Username:</strong> the SMTP username from IAM (starts with AKIA…)<br>' +
+                '<strong>Password:</strong> the SMTP password (NOT the IAM secret key)'
+        },
+        zoho: {
+            host: 'smtp.zoho.com', port: '587',
+            guide: '<strong><i class="fa-solid fa-envelope"></i> Zoho Mail Setup</strong><br><br>' +
+                '1. Sign in to <a href="https://accounts.zoho.com/home" target="_blank" rel="noopener">Zoho Accounts</a><br>' +
+                '2. Go to <strong>Security → App Passwords</strong><br>' +
+                '3. Click <strong>Generate New Password</strong> (name it "SCALZ SEO" or similar)<br>' +
+                '4. Copy the generated app password<br><br>' +
+                '<strong>Username:</strong> your full Zoho email (you@yourdomain.com)<br>' +
+                '<strong>Password:</strong> the app password you generated<br>' +
+                '<strong>Note:</strong> If your domain is hosted on Zoho EU, use <code>smtp.zoho.eu</code> instead.'
+        },
+        custom: {
+            host: '', port: '587',
+            guide: '<strong><i class="fa-solid fa-server"></i> Custom SMTP</strong><br><br>' +
+                'Enter the SMTP credentials provided by your email service. Common settings:<br><br>' +
+                '<strong>Port 587</strong> — TLS/STARTTLS (most common, recommended)<br>' +
+                '<strong>Port 465</strong> — SSL (legacy but still supported)<br>' +
+                '<strong>Port 25</strong> — Unencrypted (not recommended, often blocked)'
+        }
+    };
+
+    // Provider dropdown handler
+    document.getElementById('fts-smtp-provider').addEventListener('change', function() {
+        const val = this.value;
+        const smtpDiv = document.getElementById('fts-own-smtp');
+        const guideDiv = document.getElementById('fts-smtp-guide');
+        if (val && SMTP_PRESETS[val]) {
+            const preset = SMTP_PRESETS[val];
+            smtpDiv.style.display = 'block';
+            guideDiv.style.display = 'block';
+            guideDiv.innerHTML = preset.guide;
+            if (preset.host) document.getElementById('fts-smtp-host').value = preset.host;
+            else document.getElementById('fts-smtp-host').value = '';
+            document.getElementById('fts-smtp-port').value = preset.port;
+            document.getElementById('fts-smtp-user').value = '';
+            document.getElementById('fts-smtp-pass').value = '';
+            document.getElementById('fts-smtp-user').focus();
+        } else {
+            smtpDiv.style.display = 'none';
+            guideDiv.style.display = 'none';
+        }
     });
 
     initPasswordToggles(overlay);
@@ -946,7 +1046,7 @@ function showFirstTimeSetupModal() {
         setButtonLoading(btn, true);
 
         try {
-            const smtpChoice = document.querySelector('input[name="fts-smtp-choice"]:checked').value;
+            const smtpProvider = document.getElementById('fts-smtp-provider').value;
             const fromName = document.getElementById('fts-from-name').value.trim() || company;
             const fromEmail = document.getElementById('fts-from-email').value.trim();
 
@@ -957,15 +1057,7 @@ function showFirstTimeSetupModal() {
                 email_from: fromEmail,
             };
 
-            if (smtpChoice === 'master') {
-                // Master SMTP credentials (Scalz shared SMTP)
-                newSettings.smtp_host = 'smtp.gmail.com';
-                newSettings.smtp_port = '587';
-                newSettings.smtp_username = 'noreply@scalz.ai';
-                newSettings.smtp_password = 'scalz-master-smtp';
-                newSettings.smtp_mode = 'master';
-            } else {
-                // Own SMTP
+            if (smtpProvider) {
                 const host = document.getElementById('fts-smtp-host').value.trim();
                 const user = document.getElementById('fts-smtp-user').value.trim();
                 const pass = document.getElementById('fts-smtp-pass').value;
@@ -980,7 +1072,7 @@ function showFirstTimeSetupModal() {
                 newSettings.smtp_port = document.getElementById('fts-smtp-port').value || '587';
                 newSettings.smtp_username = user;
                 newSettings.smtp_password = pass;
-                newSettings.smtp_mode = 'own';
+                newSettings.smtp_mode = smtpProvider;
             }
 
             await upsertSettings(newSettings);
@@ -4425,6 +4517,21 @@ async function renderSettings(area) {
                             <input type="email" id="s-from-email" value="${escHtml(settings.email_from || '')}" placeholder="noreply@scalz.ai" />
                         </div>
                     </div>
+                    <div class="form-group" style="margin-bottom:var(--space-3);">
+                        <label for="s-smtp-provider">Quick Setup — Select Provider</label>
+                        <select id="s-smtp-provider">
+                            <option value="">Keep current settings</option>
+                            <option value="gmail">Gmail / Google Workspace</option>
+                            <option value="outlook">Outlook / Microsoft 365</option>
+                            <option value="sendgrid">SendGrid</option>
+                            <option value="mailgun">Mailgun</option>
+                            <option value="ses">Amazon SES</option>
+                            <option value="zoho">Zoho Mail</option>
+                            <option value="custom">Custom SMTP</option>
+                        </select>
+                        <span class="form-hint">Selecting a provider auto-fills the host and port. You still need to enter your username and password.</span>
+                    </div>
+                    <div id="s-smtp-guide" style="display:none;padding:var(--space-3);background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:var(--space-4);font-size:0.82rem;color:var(--text-secondary);line-height:1.6;"></div>
                     <div class="settings-row">
                         <div class="form-group">
                             <label for="s-smtp-host">SMTP Host</label>
@@ -4656,6 +4763,30 @@ async function renderSettings(area) {
         providerSelect?.addEventListener('change', filterModelsByProvider);
         modelSelect?.addEventListener('change', updateModelTierBadge);
         filterModelsByProvider(); // initial filter on page load
+
+        // SMTP provider quick-setup in Settings
+        const SETTINGS_SMTP_PRESETS = {
+            gmail:   { host: 'smtp.gmail.com',                        port: '587', guide: '<strong>Gmail / Google Workspace:</strong> Use your Gmail address as username. For password, generate an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App Password</a> (requires 2-Step Verification enabled). Do NOT use your Google password.' },
+            outlook: { host: 'smtp.office365.com',                    port: '587', guide: '<strong>Outlook / Microsoft 365:</strong> Use your full email as username. Generate an app password at <a href="https://account.microsoft.com/security" target="_blank" rel="noopener">Microsoft Security</a>. Some orgs need SMTP AUTH enabled by an admin.' },
+            sendgrid:{ host: 'smtp.sendgrid.net',                     port: '587', guide: '<strong>SendGrid:</strong> Username is literally <code>apikey</code>. Password is your SendGrid API key (starts with SG.). Create one at <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener">Settings → API Keys</a>. Verify your sending domain first.' },
+            mailgun: { host: 'smtp.mailgun.org',                      port: '587', guide: '<strong>Mailgun:</strong> Username is <code>postmaster@yourdomain.com</code>. Password is set under Sending → Domain settings → SMTP credentials in <a href="https://app.mailgun.com/" target="_blank" rel="noopener">Mailgun</a>. Verify your domain first.' },
+            ses:     { host: 'email-smtp.us-east-1.amazonaws.com',    port: '587', guide: '<strong>Amazon SES:</strong> Create SMTP credentials in the <a href="https://console.aws.amazon.com/ses/" target="_blank" rel="noopener">SES Console</a> under SMTP settings. Username starts with AKIA…. Change the region in the host if needed.' },
+            zoho:    { host: 'smtp.zoho.com',                         port: '587', guide: '<strong>Zoho Mail:</strong> Use your Zoho email as username. Generate an app password at <a href="https://accounts.zoho.com/home" target="_blank" rel="noopener">Security → App Passwords</a>. EU users: change host to <code>smtp.zoho.eu</code>.' },
+            custom:  { host: '',                                       port: '587', guide: '<strong>Custom SMTP:</strong> Port 587 (TLS) is most common. Port 465 is SSL. Port 25 is unencrypted (often blocked).' }
+        };
+        document.getElementById('s-smtp-provider')?.addEventListener('change', function() {
+            const val = this.value;
+            const guideDiv = document.getElementById('s-smtp-guide');
+            if (val && SETTINGS_SMTP_PRESETS[val]) {
+                const preset = SETTINGS_SMTP_PRESETS[val];
+                guideDiv.style.display = 'block';
+                guideDiv.innerHTML = preset.guide;
+                if (preset.host) document.getElementById('s-smtp-host').value = preset.host;
+                document.getElementById('s-smtp-port').value = preset.port;
+            } else {
+                guideDiv.style.display = 'none';
+            }
+        });
 
         // SMTP test button
         document.getElementById('smtp-test-btn')?.addEventListener('click', async () => {
