@@ -1,5 +1,7 @@
 name: Push plugin zip
 on: push
+permissions:
+  contents: write
 jobs:
   push:
     runs-on: ubuntu-latest
@@ -14,5 +16,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add frontend/scalz-seo-automator.zip
-          git commit -m "feat: add real plugin zip binary, remove redirect"
+          git commit -m "feat: add real plugin zip binary, remove redirect" || echo "Nothing to commit"
+          git pull --rebase origin main
           git push
