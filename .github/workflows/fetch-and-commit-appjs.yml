@@ -1,1 +1,33 @@
-bmFtZTogRmV0Y2ggYW5kIGNvbW1pdCBmcm9udGVuZCBhcHAuanMKCm9uOgogIHdvcmtmbG93X2Rpc3BhdGNoOgogIHB1c2g6CiAgICBwYXRoczoKICAgICAgLSAnLmdpdGh1Yi93b3JrZmxvd3MvZmV0Y2gtYW5kLWNvbW1pdC1hcHBqcy55bWwnCgpqb2JzOgogIGZldGNoLWFuZC1jb21taXQ6CiAgICBydW5zLW9uOiB1YnVudHUtbGF0ZXN0CiAgICBwZXJtaXNzaW9uczoKICAgICAgY29udGVudHM6IHdyaXRlCiAgICBzdGVwczoKICAgICAgLSBuYW1lOiBDaGVja291dCByZXBvc2l0b3J5CiAgICAgICAgdXNlczogYWN0aW9ucy9jaGVja291dEB2NAogICAgICAgIHdpdGg6CiAgICAgICAgICByZWY6IG1haW4KCiAgICAgIC0gbmFtZTogRmV0Y2ggYXBwLmpzIGZyb20gZHBhc3RlCiAgICAgICAgcnVuOiB8CiAgICAgICAgICBta2RpciAtcCBmcm9udGVuZAogICAgICAgICAgY3VybCAtc0wgImh0dHBzOi8vZHBhc3RlLmNvbS8yWERVNEE3WEMudHh0IiAtbyBmcm9udGVuZC9hcHAuanMKICAgICAgICAgIGVjaG8gIkRvd25sb2FkZWQgJCh3YyAtYyA8IGZyb250ZW5kL2FwcC5qcykgYnl0ZXMiCiAgICAgICAgICBoZWFkIC0zIGZyb250ZW5kL2FwcC5qcwoKICAgICAgLSBuYW1lOiBDb21taXQgYW5kIHB1c2gKICAgICAgICBydW46IHwKICAgICAgICAgIGdpdCBjb25maWcgdXNlci5uYW1lICJnaXRodWItYWN0aW9uc1tib3RdIgogICAgICAgICAgZ2l0IGNvbmZpZyB1c2VyLmVtYWlsICJnaXRodWItYWN0aW9uc1tib3RdQHVzZXJzLm5vcmVwbHkuZ2l0aHViLmNvbSIKICAgICAgICAgIGdpdCBhZGQgZnJvbnRlbmQvYXBwLmpzCiAgICAgICAgICBnaXQgY29tbWl0IC1tICJmaXg6IHVzZSB3aW5kb3cub3BlbiBmb3IgbWFpbHRvIGxpbmtzIHRvIHByZXZlbnQgcGFnZSBuYXZpZ2F0aW9uIiB8fCBlY2hvICJOb3RoaW5nIHRvIGNvbW1pdCIKICAgICAgICAgIGdpdCBwdXNoIG9yaWdpbiBtYWluCg==
+name: Fetch and commit frontend app.js
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fetch-and-commit-appjs.yml'
+
+jobs:
+  fetch-and-commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Fetch app.js from dpaste
+        run: |
+          mkdir -p frontend
+          curl -sL "https://dpaste.com/2XDU4A7XC.txt" -o frontend/app.js
+          echo "Downloaded $(wc -c < frontend/app.js) bytes"
+          head -3 frontend/app.js
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/app.js
+          git commit -m "fix: use window.open for mailto links to prevent page navigation" || echo "Nothing to commit"
+          git push origin main
