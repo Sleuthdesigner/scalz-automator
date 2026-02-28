@@ -79,4 +79,10 @@ const TEMPLATE_VARIABLES = [
     { var: '{existing_titles}', desc: 'Existing blog titles (from sitemap)' },
     { var: '{focus_keyword}', desc: 'Target SEO keyword' },
     { var: '{count}', desc: 'Number of items to generate' },
+    { var: '{sections_count}', desc: 'Number of H2 sections in blog post' },
+    { var: '{paragraphs_per_section}', desc: 'Paragraphs per blog section' },
+    { var: '{word_count_min}', desc: 'Minimum word count' },
+    { var: '{word_count_max}', desc: 'Maximum word count' },
+    { var: '{image_instructions}', desc: 'AI image generation instructions' },
+    { var: '{images_count}', desc: 'Number of images to include' },
 ];
