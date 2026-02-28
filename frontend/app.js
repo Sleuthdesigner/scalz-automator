@@ -74,7 +74,41 @@ const CREDIT_PACKAGES = {
     },
 };
 
-// Credit costs per task type (in credits)
+// ============================================
+// AI MODEL REGISTRY — All providers + pricing
+// Credits = 2× your actual API cost
+// 1 credit ≈ $0.001 sale price ($0.0005 cost)
+// ============================================
+const AI_MODELS = {
+    // ---- OpenAI ----
+    'gpt-5':            { provider: 'openai',    name: 'GPT-5',                 input: 1.25,  output: 10.00, ctx: '400K', tier: 'premium',  creditsPerKToken: 10 },
+    'gpt-5-mini':       { provider: 'openai',    name: 'GPT-5 Mini',            input: 0.25,  output: 2.00,  ctx: '400K', tier: 'standard', creditsPerKToken: 2 },
+    'gpt-5-nano':       { provider: 'openai',    name: 'GPT-5 Nano',            input: 0.05,  output: 0.40,  ctx: '400K', tier: 'economy',  creditsPerKToken: 1 },
+    'gpt-4.1':          { provider: 'openai',    name: 'GPT-4.1',               input: 2.00,  output: 8.00,  ctx: '1M',   tier: 'premium',  creditsPerKToken: 9 },
+    'gpt-4.1-mini':     { provider: 'openai',    name: 'GPT-4.1 Mini',          input: 0.40,  output: 1.60,  ctx: '1M',   tier: 'standard', creditsPerKToken: 2 },
+    'gpt-4.1-nano':     { provider: 'openai',    name: 'GPT-4.1 Nano',          input: 0.10,  output: 0.40,  ctx: '1M',   tier: 'economy',  creditsPerKToken: 1 },
+    'gpt-4o':           { provider: 'openai',    name: 'GPT-4o',                input: 2.50,  output: 10.00, ctx: '128K', tier: 'premium',  creditsPerKToken: 11 },
+    'gpt-4o-mini':      { provider: 'openai',    name: 'GPT-4o Mini',           input: 0.15,  output: 0.60,  ctx: '128K', tier: 'economy',  creditsPerKToken: 1 },
+    'o4-mini':          { provider: 'openai',    name: 'o4 Mini (Reasoning)',    input: 1.10,  output: 4.40,  ctx: '200K', tier: 'standard', creditsPerKToken: 5 },
+    'o3':               { provider: 'openai',    name: 'o3 (Reasoning)',         input: 2.00,  output: 8.00,  ctx: '200K', tier: 'premium',  creditsPerKToken: 9 },
+    'o3-mini':          { provider: 'openai',    name: 'o3 Mini (Reasoning)',    input: 1.10,  output: 4.40,  ctx: '200K', tier: 'standard', creditsPerKToken: 5 },
+    // ---- Anthropic ----
+    'claude-opus-4.6':  { provider: 'anthropic',  name: 'Claude Opus 4.6',       input: 5.00,  output: 25.00, ctx: '1M',   tier: 'ultra',    creditsPerKToken: 26 },
+    'claude-sonnet-4.6':{ provider: 'anthropic',  name: 'Claude Sonnet 4.6',     input: 3.00,  output: 15.00, ctx: '1M',   tier: 'premium',  creditsPerKToken: 16 },
+    'claude-sonnet-4.5':{ provider: 'anthropic',  name: 'Claude Sonnet 4.5',     input: 3.00,  output: 15.00, ctx: '1M',   tier: 'premium',  creditsPerKToken: 16 },
+    'claude-opus-4.5':  { provider: 'anthropic',  name: 'Claude Opus 4.5',       input: 5.00,  output: 25.00, ctx: '200K', tier: 'ultra',    creditsPerKToken: 26 },
+    'claude-haiku-4.5': { provider: 'anthropic',  name: 'Claude Haiku 4.5',      input: 1.00,  output: 5.00,  ctx: '200K', tier: 'standard', creditsPerKToken: 6 },
+    'claude-haiku-3.5': { provider: 'anthropic',  name: 'Claude 3.5 Haiku',      input: 0.80,  output: 4.00,  ctx: '200K', tier: 'standard', creditsPerKToken: 5 },
+    // ---- Google ----
+    'gemini-2.5-pro':   { provider: 'google',    name: 'Gemini 2.5 Pro',         input: 1.25,  output: 10.00, ctx: '2M',   tier: 'premium',  creditsPerKToken: 10 },
+    'gemini-2.5-flash': { provider: 'google',    name: 'Gemini 2.5 Flash',       input: 0.15,  output: 0.60,  ctx: '1M',   tier: 'economy',  creditsPerKToken: 1 },
+    'gemini-2.0-flash': { provider: 'google',    name: 'Gemini 2.0 Flash',       input: 0.10,  output: 0.40,  ctx: '1M',   tier: 'economy',  creditsPerKToken: 1 },
+    // ---- AI Engine (Meow Apps WP Plugin) ----
+    'ai-engine':        { provider: 'ai-engine', name: 'AI Engine (WP Plugin)',   input: 0,     output: 0,     ctx: 'Varies', tier: 'standard', creditsPerKToken: 5 },
+};
+
+// Base credit costs per task type (at economy tier)
+// Actual cost = base × model multiplier
 const CREDIT_COSTS = {
     page_titles: 5,
     meta_descriptions: 8,
@@ -89,6 +123,23 @@ const CREDIT_COSTS = {
     install_plugins: 0,
     parse_sitemap: 0,
 };
+
+// Tier multipliers — economy models use 1x, premium use more
+const TIER_MULTIPLIERS = {
+    economy: 1.0,
+    standard: 1.5,
+    premium: 3.0,
+    ultra: 5.0,
+};
+
+// Get effective credit cost for a task based on selected model
+function getEffectiveCreditCost(taskType, modelId) {
+    const baseCost = CREDIT_COSTS[taskType] || 0;
+    if (baseCost === 0) return 0;
+    const model = AI_MODELS[modelId];
+    const multiplier = model ? (TIER_MULTIPLIERS[model.tier] || 1) : 1;
+    return Math.ceil(baseCost * multiplier);
+}
 
 let userCredits = { balance: 0, lifetime_purchased: 0, lifetime_used: 0 };
 
@@ -4268,17 +4319,34 @@ async function renderSettings(area) {
                             <select id="s-ai-provider">
                                 <option value="openai" ${settings.ai_provider === 'openai' || !settings.ai_provider ? 'selected' : ''}>OpenAI</option>
                                 <option value="anthropic" ${settings.ai_provider === 'anthropic' ? 'selected' : ''}>Anthropic (Claude)</option>
+                                <option value="google" ${settings.ai_provider === 'google' ? 'selected' : ''}>Google (Gemini)</option>
+                                <option value="ai-engine" ${settings.ai_provider === 'ai-engine' ? 'selected' : ''}>AI Engine (Meow Apps)</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="s-ai-model">Model</label>
+                            <label for="s-ai-model">Model <span class="model-tier-badge" id="model-tier-badge"></span></label>
                             <select id="s-ai-model">
-                                <option value="gpt-4o" ${settings.ai_model === 'gpt-4o' || !settings.ai_model ? 'selected' : ''}>GPT-4o</option>
-                                <option value="gpt-4o-mini" ${settings.ai_model === 'gpt-4o-mini' ? 'selected' : ''}>GPT-4o Mini</option>
-                                <option value="gpt-4-turbo" ${settings.ai_model === 'gpt-4-turbo' ? 'selected' : ''}>GPT-4 Turbo</option>
-                                <option value="claude-3-5-sonnet-20241022" ${settings.ai_model === 'claude-3-5-sonnet-20241022' ? 'selected' : ''}>Claude 3.5 Sonnet</option>
-                                <option value="claude-3-haiku-20240307" ${settings.ai_model === 'claude-3-haiku-20240307' ? 'selected' : ''}>Claude 3 Haiku</option>
+                                ${Object.entries(AI_MODELS).map(([id, m]) => {
+                                    const tierLabel = { economy: '\u26a1', standard: '\u2b50', premium: '\ud83d\udd25', ultra: '\ud83d\udc8e' }[m.tier] || '';
+                                    const costLabel = m.creditsPerKToken + ' cr/1k tok';
+                                    return `<option value="${id}" data-provider="${m.provider}" data-tier="${m.tier}" ${settings.ai_model === id ? 'selected' : ''}>${tierLabel} ${m.name} (${m.ctx}) — ${costLabel}</option>`;
+                                }).join('')}
                             </select>
+                            <small class="form-hint">Credits charged per 1K tokens. \u26a1 Economy &bull; \u2b50 Standard &bull; \ud83d\udd25 Premium &bull; \ud83d\udc8e Ultra</small>
+                        </div>
+                    </div>
+                    <div class="form-group" id="google-api-key-group" style="display:none;">
+                        <label for="s-google-key">Google API Key</label>
+                        <div class="input-with-icon">
+                            <input type="password" id="s-google-key" value="${escHtml(settings.google_api_key || '')}" placeholder="AIza…" autocomplete="new-password" />
+                            <button type="button" class="pw-toggle" data-target="s-google-key" tabindex="-1"><i class="fa-solid fa-eye"></i></button>
+                        </div>
+                        <span class="form-hint">Get from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a></span>
+                    </div>
+                    <div class="form-group" id="ai-engine-info" style="display:none;">
+                        <div class="settings-info-box">
+                            <i class="fa-solid fa-info-circle"></i>
+                            <span>AI Engine runs on your WordPress site via the Meow Apps plugin. Configure the model inside AI Engine settings in WP Admin. Credits are charged at the Standard tier rate.</span>
                         </div>
                     </div>
                     <div class="form-group">
@@ -4505,6 +4573,53 @@ async function renderSettings(area) {
 
         initPasswordToggles(area);
 
+        // Provider ↔ model filter logic
+        const providerSelect = document.getElementById('s-ai-provider');
+        const modelSelect = document.getElementById('s-ai-model');
+        const googleKeyGroup = document.getElementById('google-api-key-group');
+        const aiEngineInfo = document.getElementById('ai-engine-info');
+        const apiKeyLabel = document.querySelector('label[for="s-ai-key"]');
+
+        function filterModelsByProvider() {
+            const provider = providerSelect.value;
+            let firstVisible = null;
+            Array.from(modelSelect.options).forEach(opt => {
+                const match = opt.dataset.provider === provider || provider === 'all';
+                opt.style.display = match ? '' : 'none';
+                opt.disabled = !match;
+                if (match && !firstVisible) firstVisible = opt;
+            });
+            // If current selection is hidden, select first visible
+            const currentOpt = modelSelect.options[modelSelect.selectedIndex];
+            if (currentOpt && currentOpt.disabled && firstVisible) {
+                firstVisible.selected = true;
+            }
+            // Toggle Google API key field
+            if (googleKeyGroup) googleKeyGroup.style.display = provider === 'google' ? '' : 'none';
+            if (aiEngineInfo) aiEngineInfo.style.display = provider === 'ai-engine' ? '' : 'none';
+            // Hide standard API key for AI Engine
+            const stdKeyGroup = document.getElementById('s-ai-key')?.closest('.form-group');
+            if (stdKeyGroup) stdKeyGroup.style.display = provider === 'ai-engine' ? 'none' : '';
+            updateModelTierBadge();
+        }
+
+        function updateModelTierBadge() {
+            const badge = document.getElementById('model-tier-badge');
+            const sel = modelSelect.value;
+            const model = AI_MODELS[sel];
+            if (badge && model) {
+                const colors = { economy: '#22c55e', standard: '#f59e0b', premium: '#ef4444', ultra: '#a855f7' };
+                badge.textContent = model.tier.charAt(0).toUpperCase() + model.tier.slice(1) + ' — ' + model.creditsPerKToken + ' cr/1k tok';
+                badge.style.color = colors[model.tier] || 'var(--text-muted)';
+                badge.style.fontSize = '0.75rem';
+                badge.style.fontWeight = '600';
+            }
+        }
+
+        providerSelect?.addEventListener('change', filterModelsByProvider);
+        modelSelect?.addEventListener('change', updateModelTierBadge);
+        filterModelsByProvider(); // initial filter on page load
+
         // SMTP test button
         document.getElementById('smtp-test-btn')?.addEventListener('click', async () => {
             const btn = document.getElementById('smtp-test-btn');
@@ -4605,6 +4720,7 @@ async function renderSettings(area) {
                 ai_images_per_post:  document.getElementById('s-img-count').value,
                 ai_image_auto_alt:   document.getElementById('s-img-alt').checked ? 'true' : 'false',
                 ai_image_style:      document.getElementById('s-img-style').value,
+                google_api_key:      document.getElementById('s-google-key')?.value?.trim() || '',
             };
 
             try {
@@ -4806,11 +4922,18 @@ function updateCreditDisplays() {
 }
 
 async function deductCredits(taskType, quantity = 1, description = '') {
-    const cost = (CREDIT_COSTS[taskType] || 0) * quantity;
+    // Get the user's selected model for model-aware pricing
+    const settings = await fetchSettings();
+    const modelId = settings.ai_model || 'gpt-4o-mini';
+    const effectiveCost = getEffectiveCreditCost(taskType, modelId);
+    const cost = effectiveCost * quantity;
     if (cost === 0) return { success: true, cost: 0 };
 
+    const modelInfo = AI_MODELS[modelId];
+    const modelName = modelInfo ? modelInfo.name : modelId;
+
     if (userCredits.balance < cost) {
-        return { success: false, cost, balance: userCredits.balance, message: `Insufficient credits. Need ${cost}, have ${userCredits.balance}.` };
+        return { success: false, cost, balance: userCredits.balance, message: `Insufficient credits. Need ${cost} (${modelName} tier), have ${userCredits.balance}. Purchase more credits.` };
     }
 
     try {
@@ -4970,6 +5093,7 @@ async function renderCredits(area) {
                 <span class="settings-section-title">Credit Costs Per Task</span>
             </div>
             <div class="settings-section-body">
+                <p class="form-hint" style="margin-bottom:var(--space-3);">Base costs shown below. Actual cost depends on your selected AI model tier: <strong>Economy ×1</strong> • <strong>Standard ×1.5</strong> • <strong>Premium ×3</strong> • <strong>Ultra ×5</strong></p>
                 <div class="credit-costs-grid">
                     ${Object.entries(CREDIT_COSTS).filter(([_, cost]) => cost > 0).map(([task, cost]) => {
                         const step = WORKFLOW_STEPS.find(s => s.id === task);
@@ -4979,14 +5103,26 @@ async function renderCredits(area) {
                             <div class="credit-cost-item">
                                 <i class="fa-solid ${icon}"></i>
                                 <span class="credit-cost-name">${name}</span>
-                                <span class="credit-cost-amount">${cost} credits</span>
+                                <span class="credit-cost-amount">${cost}–${cost * 5} cr</span>
                             </div>
                         `;
                     }).join('')}
                     <div class="credit-cost-item">
                         <i class="fa-solid fa-image"></i>
                         <span class="credit-cost-name">AI Image Generation</span>
-                        <span class="credit-cost-amount">25 credits</span>
+                        <span class="credit-cost-amount">25–125 cr</span>
+                    </div>
+                </div>
+                <div style="margin-top:var(--space-4);">
+                    <p class="form-hint" style="margin-bottom:var(--space-2);"><strong>Model Tier Reference (credits per 1K tokens, 2× cost markup):</strong></p>
+                    <div class="credit-costs-grid">
+                        ${Object.entries(AI_MODELS).map(([id, m]) => `
+                            <div class="credit-cost-item">
+                                <i class="fa-solid fa-microchip" style="color:${{ economy:'#22c55e', standard:'#f59e0b', premium:'#ef4444', ultra:'#a855f7' }[m.tier]}"></i>
+                                <span class="credit-cost-name">${m.name}</span>
+                                <span class="credit-cost-amount" style="color:${{ economy:'#22c55e', standard:'#f59e0b', premium:'#ef4444', ultra:'#a855f7' }[m.tier]}">${m.creditsPerKToken} cr/1k tok</span>
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
             </div>
