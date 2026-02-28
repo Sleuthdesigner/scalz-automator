@@ -29,6 +29,69 @@ let workflowEnabledSteps = new Set(WORKFLOW_STEPS.map(s => s.id));
 let clientsCache = [];
 let jobsSubscription = null;
 
+// Credit system config
+const CREDIT_PACKAGES = {
+    starter: {
+        name: 'Starter Pack',
+        credits: 1000,
+        price: '$29',
+        price_cents: 2900,
+        per_credit: '$0.029',
+        savings: null,
+        icon: 'fa-bolt',
+        color: '#13e4e6',
+    },
+    growth: {
+        name: 'Growth Pack',
+        credits: 5000,
+        price: '$79',
+        price_cents: 7900,
+        per_credit: '$0.016',
+        savings: '45% savings',
+        icon: 'fa-rocket',
+        color: '#6600FF',
+        popular: true,
+    },
+    agency: {
+        name: 'Agency Pack',
+        credits: 15000,
+        price: '$149',
+        price_cents: 14900,
+        per_credit: '$0.010',
+        savings: '66% savings',
+        icon: 'fa-building',
+        color: '#A01572',
+    },
+    enterprise: {
+        name: 'Enterprise Pack',
+        credits: 50000,
+        price: '$399',
+        price_cents: 39900,
+        per_credit: '$0.008',
+        savings: '72% savings',
+        icon: 'fa-crown',
+        color: '#f59e0b',
+    },
+};
+
+// Credit costs per task type (in credits)
+const CREDIT_COSTS = {
+    page_titles: 5,
+    meta_descriptions: 8,
+    blog_titles: 10,
+    blog_content: 60,
+    acf_content: 25,
+    alt_tags: 15,
+    fix_headings: 10,
+    faq_schema: 15,
+    ai_image: 25,
+    internal_linking: 5,
+    install_plugins: 0,
+    parse_sitemap: 0,
+};
+
+let userCredits = { balance: 0, lifetime_purchased: 0, lifetime_used: 0 };
+
 // ============================================
 // PRE-BUILT PRODUCTION SEO PROMPT TEMPLATES
 // ============================================
@@ -242,11 +305,13 @@ Report the status of each plugin installation.`
 **Phone:** {phone}
 
 **Content Requirements:**
-- Length: 1,500-2,000 words
+- Length: {word_count_min}-{word_count_max} words
 - Use {focus_keyword} in the first paragraph, one H2, and naturally throughout (1-2% density)
 - Include {city}, {state} references naturally throughout (local SEO)
-- Structure with clear H2 subheadings (4-6 throughout the post)
+- Structure with exactly {sections_count} H2 subheadings throughout the post
+- Each section should contain {paragraphs_per_section} paragraphs of 2-3 sentences each
 - Use H3 subheadings within sections where appropriate
+{image_instructions}
 - Write an engaging introduction (hook → problem → preview of solution)
 - Include actionable, expert-level advice (demonstrate E-E-A-T)
 - Add a FAQ section with 4-5 questions in FAQ schema-ready format
@@ -592,6 +657,7 @@ function showApp() {
     document.getElementById('app').style.display = 'flex';
     document.getElementById('onboarding-page').style.display = 'none';
     updateSidebarUser();
+    fetchUserCredits();
     handleRoute();
 }
 
@@ -646,6 +712,13 @@ function setupAuthForms() {
             currentUser = data.user;
             setButtonLoading(btn, false);
             showApp();
+            // Check if this is first login (no settings configured yet)
+            try {
+                const firstLoginCheck = await fetchSettings();
+                if (!firstLoginCheck.email_from_name && !firstLoginCheck.smtp_host) {
+                    showFirstTimeSetupModal();
+                }
+            } catch (_) {}
         }
     });
 
@@ -701,6 +774,173 @@ async function doLogout() {
     unsubscribeRealtime();
     showLoginPage();
     showToast('info', 'Signed Out', 'You have been signed out.');
+}
+
+function showFirstTimeSetupModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'first-time-setup-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="max-width:560px;">
+            <div class="modal-header">
+                <span class="modal-title" style="display:flex;align-items:center;gap:var(--space-3);">
+                    <span style="font-size:1.5rem;">🚀</span> Welcome! Let's Set Up Your Account
+                </span>
+            </div>
+            <div class="modal-body" style="gap:var(--space-5);">
+                <p style="color:var(--text-secondary);font-size:0.9rem;">Before you can send onboarding emails to clients, we need a few details.</p>
+
+                <div style="font-weight:600;font-size:0.95rem;color:var(--text-primary);margin-top:var(--space-2);">Your Information</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fts-company">Company / Agency Name <span class="required">*</span></label>
+                        <input type="text" id="fts-company" placeholder="Acme Digital Marketing" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="fts-name">Your Name <span class="required">*</span></label>
+                        <input type="text" id="fts-name" placeholder="John Smith" required />
+                    </div>
+                </div>
+
+                <div style="font-weight:600;font-size:0.95rem;color:var(--text-primary);margin-top:var(--space-2);">Email Sending</div>
+                <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:var(--space-3);">Onboarding emails will be sent from this address to your clients.</p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fts-from-name">From Name</label>
+                        <input type="text" id="fts-from-name" placeholder="Your Company Name" />
+                    </div>
+                    <div class="form-group">
+                        <label for="fts-from-email">From Email</label>
+                        <input type="email" id="fts-from-email" placeholder="hello@yourcompany.com" />
+                    </div>
+                </div>
+
+                <div style="font-weight:600;font-size:0.95rem;color:var(--text-primary);margin-top:var(--space-2);">SMTP Configuration</div>
+                <div style="display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-3);">
+                    <label class="toggle-wrapper" style="cursor:pointer;">
+                        <input type="radio" name="fts-smtp-choice" value="master" checked style="margin-right:var(--space-2);" />
+                        <span><strong>Use Scalz Master SMTP</strong> <span style="color:var(--text-muted);font-size:0.8rem;">(Recommended — works out of the box)</span></span>
+                    </label>
+                    <label class="toggle-wrapper" style="cursor:pointer;">
+                        <input type="radio" name="fts-smtp-choice" value="own" style="margin-right:var(--space-2);" />
+                        <span><strong>Use My Own SMTP Server</strong> <span style="color:var(--text-muted);font-size:0.8rem;">(Gmail, SendGrid, Mailgun, etc.)</span></span>
+                    </label>
+                </div>
+
+                <div id="fts-own-smtp" style="display:none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fts-smtp-host">SMTP Host <span class="required">*</span></label>
+                            <input type="text" id="fts-smtp-host" placeholder="smtp.gmail.com" />
+                        </div>
+                        <div class="form-group">
+                            <label for="fts-smtp-port">Port</label>
+                            <input type="number" id="fts-smtp-port" value="587" placeholder="587" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fts-smtp-user">SMTP Username <span class="required">*</span></label>
+                            <input type="text" id="fts-smtp-user" placeholder="your@email.com" autocomplete="off" />
+                        </div>
+                        <div class="form-group">
+                            <label for="fts-smtp-pass">SMTP Password <span class="required">*</span></label>
+                            <div class="input-with-icon">
+                                <input type="password" id="fts-smtp-pass" placeholder="App password" autocomplete="new-password" />
+                                <button type="button" class="pw-toggle" data-target="fts-smtp-pass" tabindex="-1"><i class="fa-solid fa-eye"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="fts-skip-btn">Skip for Now</button>
+                <button class="btn btn-primary" id="fts-save-btn">
+                    <span class="btn-text"><i class="fa-solid fa-check"></i> Complete Setup</span>
+                    <span class="btn-spinner" style="display:none;"><i class="fa-solid fa-spinner fa-spin"></i></span>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('active'));
+
+    // Toggle own SMTP fields
+    document.querySelectorAll('input[name="fts-smtp-choice"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            document.getElementById('fts-own-smtp').style.display =
+                document.querySelector('input[name="fts-smtp-choice"]:checked').value === 'own' ? 'block' : 'none';
+        });
+    });
+
+    initPasswordToggles(overlay);
+
+    // Skip button
+    document.getElementById('fts-skip-btn').addEventListener('click', () => {
+        overlay.classList.remove('active');
+        setTimeout(() => overlay.remove(), 300);
+    });
+
+    // Save button
+    document.getElementById('fts-save-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('fts-save-btn');
+        const company = document.getElementById('fts-company').value.trim();
+        const name = document.getElementById('fts-name').value.trim();
+
+        if (!company || !name) {
+            showToast('warning', 'Required', 'Please enter your company name and name.');
+            return;
+        }
+
+        setButtonLoading(btn, true);
+
+        try {
+            const smtpChoice = document.querySelector('input[name="fts-smtp-choice"]:checked').value;
+            const fromName = document.getElementById('fts-from-name').value.trim() || company;
+            const fromEmail = document.getElementById('fts-from-email').value.trim();
+
+            const newSettings = {
+                company_name: company,
+                admin_name: name,
+                email_from_name: fromName,
+                email_from: fromEmail,
+            };
+
+            if (smtpChoice === 'master') {
+                // Master SMTP credentials (Scalz shared SMTP)
+                newSettings.smtp_host = 'smtp.gmail.com';
+                newSettings.smtp_port = '587';
+                newSettings.smtp_username = 'noreply@scalz.ai';
+                newSettings.smtp_password = 'scalz-master-smtp';
+                newSettings.smtp_mode = 'master';
+            } else {
+                // Own SMTP
+                const host = document.getElementById('fts-smtp-host').value.trim();
+                const user = document.getElementById('fts-smtp-user').value.trim();
+                const pass = document.getElementById('fts-smtp-pass').value;
+
+                if (!host || !user || !pass) {
+                    showToast('warning', 'Required', 'Please fill in all SMTP fields.');
+                    setButtonLoading(btn, false);
+                    return;
+                }
+
+                newSettings.smtp_host = host;
+                newSettings.smtp_port = document.getElementById('fts-smtp-port').value || '587';
+                newSettings.smtp_username = user;
+                newSettings.smtp_password = pass;
+                newSettings.smtp_mode = 'own';
+            }
+
+            await upsertSettings(newSettings);
+            showToast('success', 'Setup Complete!', 'Your account is ready. You can now send onboarding emails to clients.');
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 300);
+        } catch (err) {
+            showToast('error', 'Error', err.message);
+            setButtonLoading(btn, false);
+        }
+    });
 }
 
 // Auth state listener
@@ -939,6 +1179,8 @@ function handleRoute() {
         renderJobs(area);
     } else if (hash === '#settings') {
         renderSettings(area);
+    } else if (hash === '#credits' || hash.startsWith('#credits?')) {
+        renderCredits(area);
     } else {
         renderDashboard(area);
     }
@@ -1033,6 +1275,36 @@ async function upsertSettings(settingsObj) {
     const { data, error } = await sb.from('settings').upsert(rows, { onConflict: 'key' });
     if (error) throw error;
     return data;
+}
+
+async function sendEmail({ to_email, to_name, subject, body_text, body_html }) {
+    const settings = await fetchSettings();
+
+    if (!settings.smtp_host || !settings.smtp_username || !settings.smtp_password) {
+        throw new Error('SMTP not configured. Go to Settings → Email & SMTP to set up email sending.');
+    }
+
+    const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            smtp_host: settings.smtp_host,
+            smtp_port: settings.smtp_port || '587',
+            smtp_username: settings.smtp_username,
+            smtp_password: settings.smtp_password,
+            from_name: settings.email_from_name || 'SCALZ SEO',
+            from_email: settings.email_from || settings.smtp_username,
+            to_email,
+            to_name: to_name || undefined,
+            subject,
+            body_text,
+            body_html,
+        }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || result.error || 'Email send failed');
+    return result;
 }
 
 async function fetchJobs(filters = {}) {
@@ -2061,13 +2333,57 @@ function openClientSetupWizard(onComplete) {
                 const link = `${window.location.origin}${window.location.pathname}#onboard/${token}`;
 
                 // Compose the email
-                const clientName   = name || 'there';
-                const senderName   = 'The SCALZ Team';
-                const subject      = 'Your SEO Onboarding Form \u2014 Let\'s Get Started';
-                const body         = `Hi ${clientName},\n\nWelcome! We're excited to help you grow your online presence.\n\nTo get started, please fill out our quick onboarding form. It takes about 5 minutes and helps us understand your business, services, and target market.\n\n\uD83D\uDC49 Click here to fill out your form:\n${link}\n\nWhat we'll need from you:\n\u2022 Your business name and contact info\n\u2022 Services you offer\n\u2022 Your primary target location and service areas\n\u2022 Your website URL and WordPress access credentials\n\nIf you have any questions, just reply to this email.\n\nLooking forward to working with you!\n\nBest regards,\n${senderName}`;
+                const settings = await fetchSettings();
+                const senderName = settings.email_from_name || settings.company_name || 'SCALZ SEO';
+                const subject = 'Your SEO Onboarding Form \u2014 Let\'s Get Started';
 
-                const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-                window.open(mailtoUrl, '_blank');
+                const bodyText = `Hi ${name || 'there'},\n\nWelcome! We're excited to help you grow your online presence.\n\nTo get started, please fill out our quick onboarding form. It takes about 5 minutes and helps us understand your business, services, and target market.\n\n\uD83D\uDC49 Fill out your form here:\n${link}\n\nWhat we'll need from you:\n\u2022 Your business name and contact info\n\u2022 Services you offer\n\u2022 Your primary target location and service areas\n\u2022 Your website URL and WordPress access credentials\n\nIf you have any questions, just reply to this email.\n\nLooking forward to working with you!\n\nBest regards,\n${senderName}`;
+
+                const bodyHtml = `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+    <div style="background: linear-gradient(135deg, #050913, #0a1628); padding: 32px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h1 style="color: #13e4e6; margin: 0; font-size: 24px;">Let's Get Started! \uD83D\uDE80</h1>
+    </div>
+    <div style="background: #ffffff; padding: 32px; border: 1px solid #e5e7eb;">
+        <p style="font-size: 16px; line-height: 1.6;">Hi <strong>${escHtml(name || 'there')}</strong>,</p>
+        <p style="font-size: 16px; line-height: 1.6;">Welcome! We're excited to help you grow your online presence.</p>
+        <p style="font-size: 16px; line-height: 1.6;">To get started, please fill out our quick onboarding form. It takes about 5 minutes and helps us understand your business, services, and target market.</p>
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="${escHtml(link)}" style="display: inline-block; background: linear-gradient(135deg, #6600FF, #13e4e6); color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-weight: 600; font-size: 16px;">Fill Out Your Onboarding Form \u2192</a>
+        </div>
+        <p style="font-size: 14px; color: #666; line-height: 1.5;"><strong>What we'll need from you:</strong></p>
+        <ul style="font-size: 14px; color: #666; line-height: 1.8; padding-left: 20px;">
+            <li>Your business name and contact info</li>
+            <li>Services you offer</li>
+            <li>Your primary target location and service areas</li>
+            <li>Your website URL and WordPress access credentials</li>
+        </ul>
+        <p style="font-size: 14px; color: #666; line-height: 1.5;">If you have any questions, just reply to this email.</p>
+        <p style="font-size: 16px; line-height: 1.6;">Looking forward to working with you!</p>
+        <p style="font-size: 16px; line-height: 1.6;">Best regards,<br><strong>${escHtml(senderName)}</strong></p>
+    </div>
+    <div style="background: #f9fafb; padding: 16px; border-radius: 0 0 12px 12px; border: 1px solid #e5e7eb; border-top: none; text-align: center;">
+        <p style="font-size: 12px; color: #999; margin: 0;">Powered by ${escHtml(settings.company_name || 'SCALZ SEO Automation')}</p>
+    </div>
+</div>`;
+
+                // Try sending via SMTP
+                let emailSent = false;
+                try {
+                    await sendEmail({
+                        to_email: email,
+                        to_name: name || undefined,
+                        subject,
+                        body_text: bodyText,
+                        body_html: bodyHtml,
+                    });
+                    emailSent = true;
+                } catch (smtpErr) {
+                    console.warn('SMTP send failed, falling back to mailto:', smtpErr.message);
+                    // Fallback to mailto
+                    const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
+                    window.open(mailtoUrl, '_blank');
+                }
 
                 // Copy to clipboard
                 try { await navigator.clipboard.writeText(link); } catch (_) {}
@@ -2079,7 +2395,11 @@ function openClientSetupWizard(onComplete) {
                 wizardData.onboardingLink  = link;
                 wizardData.formSent        = true;
 
-                showToast('success', 'Email Opened!', 'Link also copied to clipboard.');
+                if (emailSent) {
+                    showToast('success', 'Email Sent!', `Onboarding email sent to ${email}. Link also copied to clipboard.`);
+                } else {
+                    showToast('info', 'Email Opened', 'SMTP not configured \u2014 email opened in your mail client. Link copied to clipboard.');
+                }
                 renderWizardStep();
             } catch (err) {
                 showToast('error', 'Error', err.message);
@@ -4023,6 +4343,12 @@ async function renderSettings(area) {
                             </div>
                         </div>
                     </div>
+                    <div style="margin-top:var(--space-4);">
+                        <button class="btn btn-ghost btn-sm" id="smtp-test-btn">
+                            <i class="fa-solid fa-paper-plane"></i> Send Test Email
+                        </button>
+                        <span id="smtp-test-result" style="margin-left:var(--space-3);font-size:0.8rem;"></span>
+                    </div>
                 </div>
             </div>
 
@@ -4097,9 +4423,140 @@ async function renderSettings(area) {
                     </div>
                 </div>
             </div>
+
+            <!-- Blog Content Controls -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <i class="fa-solid fa-blog"></i>
+                    <span class="settings-section-title">Blog Content Settings</span>
+                </div>
+                <div class="settings-section-body">
+                    <div class="settings-row">
+                        <div class="form-group">
+                            <label for="s-blog-sections">Sections (H2s) Per Post</label>
+                            <input type="number" id="s-blog-sections" value="${escHtml(settings.blog_sections_count || '5')}" min="2" max="15" />
+                            <small class="form-hint">Number of H2 subheadings in each blog post</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="s-blog-paragraphs">Paragraphs Per Section</label>
+                            <input type="number" id="s-blog-paragraphs" value="${escHtml(settings.blog_paragraphs_per_section || '3')}" min="1" max="8" />
+                            <small class="form-hint">Paragraphs under each H2 section</small>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <div class="form-group">
+                            <label for="s-blog-word-min">Min Word Count</label>
+                            <input type="number" id="s-blog-word-min" value="${escHtml(settings.blog_word_count_min || '1500')}" min="500" max="10000" step="100" />
+                        </div>
+                        <div class="form-group">
+                            <label for="s-blog-word-max">Max Word Count</label>
+                            <input type="number" id="s-blog-word-max" value="${escHtml(settings.blog_word_count_max || '2000')}" min="500" max="10000" step="100" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Image Settings -->
+            <div class="settings-section">
+                <div class="settings-section-header">
+                    <i class="fa-solid fa-image"></i>
+                    <span class="settings-section-title">AI Image Generation</span>
+                </div>
+                <div class="settings-section-body">
+                    <div class="settings-row">
+                        <div class="form-group">
+                            <label for="s-img-provider">Image Provider</label>
+                            <select id="s-img-provider">
+                                <option value="none" ${!settings.ai_image_provider || settings.ai_image_provider === 'none' ? 'selected' : ''}>None (No images)</option>
+                                <option value="dall-e-3" ${settings.ai_image_provider === 'dall-e-3' ? 'selected' : ''}>DALL-E 3 (OpenAI)</option>
+                                <option value="dall-e-2" ${settings.ai_image_provider === 'dall-e-2' ? 'selected' : ''}>DALL-E 2 (OpenAI)</option>
+                                <option value="stable-diffusion" ${settings.ai_image_provider === 'stable-diffusion' ? 'selected' : ''}>Stable Diffusion</option>
+                                <option value="midjourney" ${settings.ai_image_provider === 'midjourney' ? 'selected' : ''}>Midjourney API</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="s-img-count">Images Per Blog Post</label>
+                            <input type="number" id="s-img-count" value="${escHtml(settings.ai_images_per_post || '2')}" min="0" max="10" />
+                            <small class="form-hint">25 credits per image generated</small>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="toggle-wrapper">
+                            <span class="toggle">
+                                <input type="checkbox" id="s-img-alt" ${settings.ai_image_auto_alt !== 'false' ? 'checked' : ''} />
+                                <span class="toggle-slider"></span>
+                            </span>
+                            <span class="toggle-label">Auto-generate SEO alt text for AI images</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="s-img-style">Default Image Style</label>
+                        <select id="s-img-style">
+                            <option value="photorealistic" ${!settings.ai_image_style || settings.ai_image_style === 'photorealistic' ? 'selected' : ''}>Photorealistic</option>
+                            <option value="illustration" ${settings.ai_image_style === 'illustration' ? 'selected' : ''}>Illustration</option>
+                            <option value="3d-render" ${settings.ai_image_style === '3d-render' ? 'selected' : ''}>3D Render</option>
+                            <option value="infographic" ${settings.ai_image_style === 'infographic' ? 'selected' : ''}>Infographic Style</option>
+                            <option value="minimalist" ${settings.ai_image_style === 'minimalist' ? 'selected' : ''}>Minimalist</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
         `;
 
         initPasswordToggles(area);
+
+        // SMTP test button
+        document.getElementById('smtp-test-btn')?.addEventListener('click', async () => {
+            const btn = document.getElementById('smtp-test-btn');
+            const resultSpan = document.getElementById('smtp-test-result');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+            btn.disabled = true;
+            resultSpan.textContent = '';
+
+            try {
+                // Get current form values (not saved yet)
+                const testSettings = {
+                    smtp_host: document.getElementById('s-smtp-host').value.trim(),
+                    smtp_port: document.getElementById('s-smtp-port').value || '587',
+                    smtp_username: document.getElementById('s-smtp-user').value.trim(),
+                    smtp_password: document.getElementById('s-smtp-pass').value,
+                    from_name: document.getElementById('s-from-name').value.trim() || 'SCALZ SEO',
+                    from_email: document.getElementById('s-from-email').value.trim() || document.getElementById('s-smtp-user').value.trim(),
+                };
+
+                if (!testSettings.smtp_host || !testSettings.smtp_username || !testSettings.smtp_password) {
+                    throw new Error('Please fill in SMTP host, username, and password first.');
+                }
+
+                // Send test email to the logged-in user
+                const { data: { user } } = await sb.auth.getUser();
+                const response = await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...testSettings,
+                        to_email: user.email,
+                        subject: 'SCALZ SMTP Test \u2014 It Works! \u2705',
+                        body_text: 'This is a test email from your SCALZ SEO Automation dashboard. If you received this, your SMTP settings are configured correctly!',
+                        body_html: '<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px;"><h2 style="color:#13e4e6;">SMTP Test Successful \u2705</h2><p>This is a test email from your SCALZ SEO Automation dashboard.</p><p>If you received this, your SMTP settings are configured correctly!</p></div>',
+                    }),
+                });
+
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message || result.error);
+
+                resultSpan.style.color = 'var(--green)';
+                resultSpan.textContent = '\u2713 Test email sent to ' + user.email;
+                showToast('success', 'Test Sent!', 'Check your inbox for the test email.');
+            } catch (err) {
+                resultSpan.style.color = 'var(--red)';
+                resultSpan.textContent = '\u2717 ' + err.message;
+                showToast('error', 'Test Failed', err.message);
+            }
+
+            btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Test Email';
+            btn.disabled = false;
+        });
 
         // Add plugin button
         document.getElementById('add-plugin-btn').addEventListener('click', () => openPluginModal(null, async () => {
@@ -4140,6 +4597,14 @@ async function renderSettings(area) {
                 default_heading_level: document.getElementById('s-heading-level').value,
                 auto_run_workflow:   document.getElementById('s-auto-run').checked ? 'true' : 'false',
                 notify_on_complete:  document.getElementById('s-notify-email').checked ? 'true' : 'false',
+                blog_sections_count: document.getElementById('s-blog-sections').value,
+                blog_paragraphs_per_section: document.getElementById('s-blog-paragraphs').value,
+                blog_word_count_min: document.getElementById('s-blog-word-min').value,
+                blog_word_count_max: document.getElementById('s-blog-word-max').value,
+                ai_image_provider:   document.getElementById('s-img-provider').value,
+                ai_images_per_post:  document.getElementById('s-img-count').value,
+                ai_image_auto_alt:   document.getElementById('s-img-alt').checked ? 'true' : 'false',
+                ai_image_style:      document.getElementById('s-img-style').value,
             };
 
             try {
@@ -4279,6 +4744,332 @@ function openPluginModal(plugin, onSave) {
             showToast('error', 'Error', err.message);
             setButtonLoading(btn, false);
         }
+    });
+}
+
+/* =============================================
+   CREDITS & BILLING PAGE
+============================================= */
+
+async function fetchUserCredits() {
+    try {
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user) return;
+
+        let { data, error } = await sb.from('credits').select('*').eq('user_id', user.id).single();
+
+        if (error && error.code === 'PGRST116') {
+            // No credit row — create with 100 free starter credits
+            const { data: newRow, error: insertErr } = await sb.from('credits')
+                .insert({ user_id: user.id, balance: 100, lifetime_purchased: 0, lifetime_used: 0 })
+                .select().single();
+            if (insertErr) { console.error('Credit init error:', insertErr); return; }
+            data = newRow;
+
+            // Log the welcome bonus
+            await sb.from('credit_transactions').insert({
+                user_id: user.id,
+                type: 'bonus',
+                amount: 100,
+                balance_after: 100,
+                description: 'Welcome bonus — 100 free credits',
+            });
+        } else if (error) {
+            console.error('Credit fetch error:', error);
+            return;
+        }
+
+        userCredits = data || { balance: 0, lifetime_purchased: 0, lifetime_used: 0 };
+        updateCreditDisplays();
+    } catch (err) {
+        console.error('fetchUserCredits error:', err);
+    }
+}
+
+function updateCreditDisplays() {
+    const bal = userCredits.balance || 0;
+    const formatted = bal.toLocaleString();
+
+    const topbarCount = document.getElementById('topbar-credit-count');
+    const navBadge = document.getElementById('nav-credit-badge');
+
+    if (topbarCount) topbarCount.textContent = formatted;
+    if (navBadge) navBadge.textContent = formatted;
+
+    // Color the badge based on balance
+    if (navBadge) {
+        navBadge.classList.remove('badge-low', 'badge-warning', 'badge-good');
+        if (bal < 100) navBadge.classList.add('badge-low');
+        else if (bal < 500) navBadge.classList.add('badge-warning');
+        else navBadge.classList.add('badge-good');
+    }
+}
+
+async function deductCredits(taskType, quantity = 1, description = '') {
+    const cost = (CREDIT_COSTS[taskType] || 0) * quantity;
+    if (cost === 0) return { success: true, cost: 0 };
+
+    if (userCredits.balance < cost) {
+        return { success: false, cost, balance: userCredits.balance, message: `Insufficient credits. Need ${cost}, have ${userCredits.balance}.` };
+    }
+
+    try {
+        const { data: { user } } = await sb.auth.getUser();
+        const newBalance = userCredits.balance - cost;
+        const newLifetimeUsed = (userCredits.lifetime_used || 0) + cost;
+
+        await sb.from('credits').update({
+            balance: newBalance,
+            lifetime_used: newLifetimeUsed,
+            updated_at: new Date().toISOString(),
+        }).eq('user_id', user.id);
+
+        await sb.from('credit_transactions').insert({
+            user_id: user.id,
+            type: 'usage',
+            amount: -cost,
+            balance_after: newBalance,
+            description: description || `${taskType} × ${quantity} (${cost} credits)`,
+            metadata: { task_type: taskType, quantity },
+        });
+
+        userCredits.balance = newBalance;
+        userCredits.lifetime_used = newLifetimeUsed;
+        updateCreditDisplays();
+
+        return { success: true, cost, balance: newBalance };
+    } catch (err) {
+        console.error('deductCredits error:', err);
+        return { success: false, cost, message: err.message };
+    }
+}
+
+async function renderCredits(area) {
+    currentPage = 'credits';
+
+    // Check for returning from Stripe checkout
+    const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    const sessionId = hashParams.get('session_id');
+    const status = hashParams.get('status');
+
+    if (sessionId && status === 'success') {
+        // Verify the checkout session
+        try {
+            const { data: { user } } = await sb.auth.getUser();
+            const response = await fetch('/api/verify-checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, user_id: user.id }),
+            });
+            const result = await response.json();
+            if (result.status === 'completed') {
+                showToast('success', 'Payment Successful!', `${result.credits_added?.toLocaleString()} credits added to your account.`);
+                await fetchUserCredits();
+            } else if (result.status === 'already_completed') {
+                userCredits.balance = result.balance;
+                updateCreditDisplays();
+            }
+        } catch (err) {
+            console.error('Verify checkout error:', err);
+        }
+        // Clean up URL
+        window.location.hash = '#credits';
+        return renderCredits(area);
+    }
+
+    if (status === 'cancelled') {
+        showToast('warning', 'Cancelled', 'Credit purchase was cancelled.');
+        window.location.hash = '#credits';
+        return renderCredits(area);
+    }
+
+    await fetchUserCredits();
+
+    // Fetch transaction history
+    let transactions = [];
+    try {
+        const { data: { user } } = await sb.auth.getUser();
+        const { data, error } = await sb.from('credit_transactions')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(50);
+        if (!error) transactions = data || [];
+    } catch (err) { /* ignore */ }
+
+    const bal = userCredits.balance || 0;
+    const purchased = userCredits.lifetime_purchased || 0;
+    const used = userCredits.lifetime_used || 0;
+
+    area.innerHTML = `
+        <div class="page-header">
+            <div class="page-header-left">
+                <h1>Credits & Billing</h1>
+                <p class="page-subtitle">Purchase credits and track usage across all AI generation tasks</p>
+            </div>
+        </div>
+
+        <!-- Credit Overview Cards -->
+        <div class="credit-overview">
+            <div class="credit-card credit-card-balance">
+                <div class="credit-card-icon"><i class="fa-solid fa-coins"></i></div>
+                <div class="credit-card-info">
+                    <span class="credit-card-value">${bal.toLocaleString()}</span>
+                    <span class="credit-card-label">Available Credits</span>
+                </div>
+                ${bal < 100 ? '<div class="credit-card-warning"><i class="fa-solid fa-exclamation-triangle"></i> Low balance</div>' : ''}
+            </div>
+            <div class="credit-card">
+                <div class="credit-card-icon" style="background:rgba(34,197,94,0.15);color:#22c55e;"><i class="fa-solid fa-cart-shopping"></i></div>
+                <div class="credit-card-info">
+                    <span class="credit-card-value">${purchased.toLocaleString()}</span>
+                    <span class="credit-card-label">Total Purchased</span>
+                </div>
+            </div>
+            <div class="credit-card">
+                <div class="credit-card-icon" style="background:rgba(239,68,68,0.15);color:#ef4444;"><i class="fa-solid fa-fire"></i></div>
+                <div class="credit-card-info">
+                    <span class="credit-card-value">${used.toLocaleString()}</span>
+                    <span class="credit-card-label">Total Used</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Credit Pricing -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <i class="fa-solid fa-tags"></i>
+                <span class="settings-section-title">Buy Credits</span>
+            </div>
+            <div class="settings-section-body">
+                <div class="credit-packages">
+                    ${Object.entries(CREDIT_PACKAGES).map(([key, pkg]) => `
+                        <div class="credit-package ${pkg.popular ? 'credit-package-popular' : ''}" data-package="${key}">
+                            ${pkg.popular ? '<div class="credit-package-badge">Most Popular</div>' : ''}
+                            <div class="credit-package-icon" style="color:${pkg.color};">
+                                <i class="fa-solid ${pkg.icon}"></i>
+                            </div>
+                            <div class="credit-package-name">${pkg.name}</div>
+                            <div class="credit-package-credits">${pkg.credits.toLocaleString()} credits</div>
+                            <div class="credit-package-price">${pkg.price}</div>
+                            <div class="credit-package-per">${pkg.per_credit}/credit</div>
+                            ${pkg.savings ? `<div class="credit-package-savings">${pkg.savings}</div>` : '<div class="credit-package-savings">&nbsp;</div>'}
+                            <button class="btn btn-primary btn-full buy-credits-btn" data-package="${key}">
+                                <i class="fa-solid fa-credit-card"></i> Purchase
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+
+        <!-- Credit Costs Reference -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <i class="fa-solid fa-calculator"></i>
+                <span class="settings-section-title">Credit Costs Per Task</span>
+            </div>
+            <div class="settings-section-body">
+                <div class="credit-costs-grid">
+                    ${Object.entries(CREDIT_COSTS).filter(([_, cost]) => cost > 0).map(([task, cost]) => {
+                        const step = WORKFLOW_STEPS.find(s => s.id === task);
+                        const name = step ? step.name : task.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        const icon = step ? step.icon : 'fa-cog';
+                        return `
+                            <div class="credit-cost-item">
+                                <i class="fa-solid ${icon}"></i>
+                                <span class="credit-cost-name">${name}</span>
+                                <span class="credit-cost-amount">${cost} credits</span>
+                            </div>
+                        `;
+                    }).join('')}
+                    <div class="credit-cost-item">
+                        <i class="fa-solid fa-image"></i>
+                        <span class="credit-cost-name">AI Image Generation</span>
+                        <span class="credit-cost-amount">25 credits</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction History -->
+        <div class="settings-section">
+            <div class="settings-section-header">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span class="settings-section-title">Transaction History</span>
+            </div>
+            <div class="settings-section-body">
+                ${transactions.length === 0 ? '<p class="text-muted">No transactions yet. Purchase credits to get started.</p>' : `
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th style="text-align:right;">Amount</th>
+                                    <th style="text-align:right;">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${transactions.map(tx => {
+                                    const date = new Date(tx.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                                    const typeClass = tx.type === 'purchase' || tx.type === 'bonus' ? 'badge-green' : tx.type === 'usage' ? 'badge-red' : 'badge-gray';
+                                    const amountClass = tx.amount > 0 ? 'text-green' : 'text-red';
+                                    const amountStr = tx.amount > 0 ? `+${tx.amount.toLocaleString()}` : tx.amount.toLocaleString();
+                                    return `
+                                        <tr>
+                                            <td>${date}</td>
+                                            <td><span class="badge ${typeClass}">${tx.type}</span></td>
+                                            <td>${escHtml(tx.description || '\u2014')}</td>
+                                            <td style="text-align:right;" class="${amountClass}">${amountStr}</td>
+                                            <td style="text-align:right;">${(tx.balance_after || 0).toLocaleString()}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        </div>
+    `;
+
+    // Bind purchase buttons
+    document.querySelectorAll('.buy-credits-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const packageKey = btn.dataset.package;
+            const pkg = CREDIT_PACKAGES[packageKey];
+            if (!pkg) return;
+
+            setButtonLoading(btn, true);
+
+            try {
+                const { data: { user } } = await sb.auth.getUser();
+                const response = await fetch('/api/create-checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        package_key: packageKey,
+                        user_id: user.id,
+                        user_email: user.email,
+                    }),
+                });
+
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Failed to create checkout session');
+
+                // Redirect to Stripe Checkout
+                if (result.checkout_url) {
+                    window.open(result.checkout_url, '_blank');
+                    showToast('info', 'Checkout Opened', 'Complete your purchase in the new tab. Credits will be added automatically.');
+                }
+            } catch (err) {
+                showToast('error', 'Error', err.message);
+            }
+
+            setButtonLoading(btn, false);
+        });
     });
 }
 
