@@ -2,10 +2,16 @@ name: Fetch and commit scalz-seo-automator.zip
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'frontend/scalz-seo-automator.zip'
 
 jobs:
   fetch-and-commit:
     runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,7 +25,17 @@ jobs:
           echo "Downloaded $(wc -c < frontend/scalz-seo-automator.zip) bytes"
           file frontend/scalz-seo-automator.zip
 
+      - name: Check if zip changed
+        id: check_zip
+        run: |
+          if git diff --quiet frontend/scalz-seo-automator.zip 2>/dev/null; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Commit and push
+        if: steps.check_zip.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
