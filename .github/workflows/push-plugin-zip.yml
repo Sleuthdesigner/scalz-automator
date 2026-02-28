@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Download and commit zip
         run: |
-          curl -sL "https://files.catbox.moe/aq0oj6.zip" -o frontend/scalz-seo-automator.zip
+          curl -sL "https://x0.at/cArO.zip" -o frontend/scalz-seo-automator.zip
           ls -la frontend/scalz-seo-automator.zip
           file frontend/scalz-seo-automator.zip
           git rm -f frontend/vercel.json || true
