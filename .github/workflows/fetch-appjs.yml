@@ -22,26 +22,31 @@ jobs:
       - name: Fetch app.js from dpaste
         run: |
           echo "Fetching app.js from dpaste..."
-          curl -sSL --retry 3 --retry-delay 2 -o frontend/app.js https://dpaste.com/8T7LW4GSB.txt
+          curl -sSL --retry 3 --retry-delay 5 -o frontend/app.js https://dpaste.com/8T7LW4GSB.txt
           APPJS_SIZE=$(wc -c < frontend/app.js)
           echo "app.js: ${APPJS_SIZE} bytes"
-          if [ "$APPJS_SIZE" -lt 10000 ]; then
+          if [ "$APPJS_SIZE" -lt 200000 ]; then
             echo "ERROR: app.js too small (${APPJS_SIZE} bytes), fetch may have failed"
-            cat frontend/app.js
+            head -5 frontend/app.js
             exit 1
           fi
+          echo "app.js OK (${APPJS_SIZE} bytes)"
+
+      - name: Wait before next fetch
+        run: sleep 10
 
       - name: Fetch style.css from dpaste
         run: |
           echo "Fetching style.css from dpaste..."
-          curl -sSL --retry 3 --retry-delay 2 -o frontend/style.css https://dpaste.com/BAME4W58H.txt
+          curl -sSL --retry 3 --retry-delay 5 -o frontend/style.css https://dpaste.com/BAME4W58H.txt
           CSS_SIZE=$(wc -c < frontend/style.css)
           echo "style.css: ${CSS_SIZE} bytes"
-          if [ "$CSS_SIZE" -lt 10000 ]; then
+          if [ "$CSS_SIZE" -lt 50000 ]; then
             echo "ERROR: style.css too small (${CSS_SIZE} bytes), fetch may have failed"
-            cat frontend/style.css
+            head -5 frontend/style.css
             exit 1
           fi
+          echo "style.css OK (${CSS_SIZE} bytes)"
 
       - name: Commit and push files
         run: |
@@ -51,7 +56,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit, skipping."
           else
-            git commit -m "chore: update frontend/app.js and frontend/style.css from dpaste sources"
+            git commit -m "feat: update frontend/app.js and frontend/style.css (AI models + credit updates)"
             git push
             echo "Files committed and pushed successfully."
           fi
