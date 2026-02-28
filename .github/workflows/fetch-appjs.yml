@@ -22,7 +22,7 @@ jobs:
       - name: Fetch app.js from dpaste
         run: |
           echo "Fetching app.js from dpaste..."
-          curl -sSL --retry 3 --retry-delay 2 -o frontend/app.js https://dpaste.com/93TC2YS6Z.txt
+          curl -sSL --retry 3 --retry-delay 2 -o frontend/app.js https://dpaste.com/8T7LW4GSB.txt
           APPJS_SIZE=$(wc -c < frontend/app.js)
           echo "app.js: ${APPJS_SIZE} bytes"
           if [ "$APPJS_SIZE" -lt 10000 ]; then
@@ -34,7 +34,7 @@ jobs:
       - name: Fetch style.css from dpaste
         run: |
           echo "Fetching style.css from dpaste..."
-          curl -sSL --retry 3 --retry-delay 2 -o frontend/style.css https://dpaste.com/7WTNR5WBU.txt
+          curl -sSL --retry 3 --retry-delay 2 -o frontend/style.css https://dpaste.com/BAME4W58H.txt
           CSS_SIZE=$(wc -c < frontend/style.css)
           echo "style.css: ${CSS_SIZE} bytes"
           if [ "$CSS_SIZE" -lt 10000 ]; then
