@@ -5,7 +5,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - '.github/workflows/fetch-appjs.yml'  # Re-run if workflow itself changes
+      - '.github/workflows/fetch-appjs.yml'
 
 jobs:
   fetch-files:
@@ -22,14 +22,26 @@ jobs:
       - name: Fetch app.js from dpaste
         run: |
           echo "Fetching app.js from dpaste..."
-          curl -fsSL https://dpaste.com/93TC2YS6Z.txt -o frontend/app.js
-          echo "Downloaded $(wc -c < frontend/app.js) bytes for app.js"
+          curl -sSL --retry 3 --retry-delay 2 -o frontend/app.js https://dpaste.com/93TC2YS6Z.txt
+          APPJS_SIZE=$(wc -c < frontend/app.js)
+          echo "app.js: ${APPJS_SIZE} bytes"
+          if [ "$APPJS_SIZE" -lt 10000 ]; then
+            echo "ERROR: app.js too small (${APPJS_SIZE} bytes), fetch may have failed"
+            cat frontend/app.js
+            exit 1
+          fi
 
       - name: Fetch style.css from dpaste
         run: |
           echo "Fetching style.css from dpaste..."
-          curl -fsSL https://dpaste.com/7WTNR5WBU.txt -o frontend/style.css
-          echo "Downloaded $(wc -c < frontend/style.css) bytes for style.css"
+          curl -sSL --retry 3 --retry-delay 2 -o frontend/style.css https://dpaste.com/7WTNR5WBU.txt
+          CSS_SIZE=$(wc -c < frontend/style.css)
+          echo "style.css: ${CSS_SIZE} bytes"
+          if [ "$CSS_SIZE" -lt 10000 ]; then
+            echo "ERROR: style.css too small (${CSS_SIZE} bytes), fetch may have failed"
+            cat frontend/style.css
+            exit 1
+          fi
 
       - name: Commit and push files
         run: |
