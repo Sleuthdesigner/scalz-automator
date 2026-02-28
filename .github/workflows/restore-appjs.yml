@@ -2,10 +2,15 @@ name: Restore frontend/app.js from dpaste
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/restore-appjs.yml'
 
 jobs:
   restore-file:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,5 +28,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add frontend/app.js
-          git commit -m "feat: email-first client onboarding wizard, enhanced intake form with target market and service areas, fixed DB column mappings"
+          git diff --cached --stat
+          git commit -m "feat: email-first client onboarding wizard, enhanced intake form with target market and service areas, fixed DB column mappings" || echo "Nothing to commit"
           git push origin main
