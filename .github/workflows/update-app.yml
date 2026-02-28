@@ -1,0 +1,29 @@
+name: Update app.js
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-file:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download app.js from dpaste
+        run: |
+          curl -s -o frontend/app.js https://dpaste.com/EZ7ESFQVL.txt
+
+      - name: Commit and push app.js
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/app.js
+          git commit -m "feat: SMTP provider quick-setup with guides for Gmail, Outlook, SendGrid, Mailgun, SES, Zoho
+
+- Replace master SMTP option with provider dropdown in first-time setup
+- Add step-by-step setup instructions for each provider
+- Add provider quick-setup dropdown to Settings page
+- Auto-fill host/port when provider selected
+- Includes clickable links to each provider's setup pages"
+          git push
