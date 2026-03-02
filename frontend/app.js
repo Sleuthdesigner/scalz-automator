@@ -24,6 +24,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // App state
 let currentPage = null;
 let currentUser = null;
+let currentUserRole = 'user';
 let realtimeChannel = null;
 let workflowEnabledSteps = new Set(WORKFLOW_STEPS.map(s => s.id));
 let clientsCache = [];
@@ -703,11 +704,11 @@ function showLoginPage() {
     document.getElementById('onboarding-page').style.display = 'none';
 }
 
-function showApp() {
+async function showApp() {
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     document.getElementById('onboarding-page').style.display = 'none';
-    updateSidebarUser();
+    await updateSidebarUser();
     fetchUserCredits();
     handleRoute();
 }
@@ -718,12 +719,24 @@ function showOnboardingLayout() {
     document.getElementById('onboarding-page').style.display = 'block';
 }
 
-function updateSidebarUser() {
+async function updateSidebarUser() {
     if (!currentUser) return;
     const email = currentUser.email || '';
     const initials = email ? email[0].toUpperCase() : 'U';
     document.getElementById('sidebar-user-email').textContent = email;
     document.getElementById('sidebar-user-avatar').textContent = initials;
+
+    // Fetch role from profiles table
+    try {
+        const { data: profile } = await sb.from('profiles').select('role').eq('id', currentUser.id).single();
+        const role = profile?.role || 'user';
+        currentUserRole = role;
+        const roleLabel = role === 'admin' ? 'Administrator' : 'User';
+        document.getElementById('sidebar-user-role').textContent = roleLabel;
+    } catch (e) {
+        currentUserRole = 'user';
+        document.getElementById('sidebar-user-role').textContent = 'User';
+    }
 }
 
 function setupAuthForms() {
